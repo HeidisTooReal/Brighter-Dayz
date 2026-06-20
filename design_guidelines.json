@@ -1,0 +1,105 @@
+{
+  "project_name": "Brighter Dayz",
+  "theme": "Light",
+  "archetypes": [
+    "Vibrant Play (Archetype 6) - For Kid Dashboard",
+    "Organic & Earthy (Archetype 1) - For Parent Dashboard"
+  ],
+  "typography": {
+    "kids_headings": {
+      "family": "Fredoka",
+      "weights": ["600", "700"],
+      "usage": "H1, H2, large buttons, playful modules in kid view"
+    },
+    "body_and_parent": {
+      "family": "Nunito",
+      "weights": ["400", "500", "600", "700"],
+      "usage": "Parent dashboard, body text, readable blocks, labels"
+    },
+    "scale": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight",
+      "h3": "text-xl sm:text-2xl",
+      "body": "text-base md:text-lg leading-relaxed",
+      "button": "text-lg md:text-xl font-semibold"
+    }
+  },
+  "colors": {
+    "background": "#FDFBF7",
+    "text_primary": "#1D3557",
+    "text_secondary": "#457B9D",
+    "kids_palette": {
+      "sunshine_yellow": "#FFD166",
+      "soft_mint": "#D8F3DC",
+      "lavender": "#E8DFF5",
+      "gentle_peach": "#F4A261",
+      "sky_blue": "#E0F2FE",
+      "crisis_button": "#FFA69E"
+    },
+    "parent_palette": {
+      "slate_bg": "#F8F9FA",
+      "primary_accent": "#457B9D",
+      "border": "#E2E8F0"
+    }
+  },
+  "spacing_and_layout": {
+    "kids_dashboard": {
+      "grid": "Bento Grid Mode A (Tetris Grid) with large, friendly, asymmetrical blocks",
+      "gap": "gap-6 md:gap-8",
+      "padding": "p-6 md:p-8",
+      "border_radius": "rounded-3xl",
+      "alignment": "Optical alignment, visual icons favored over dense text"
+    },
+    "parent_dashboard": {
+      "grid": "Control Room Grid Mode B",
+      "gap": "gap-4 md:gap-6",
+      "padding": "p-4 md:p-6",
+      "border_radius": "rounded-xl"
+    }
+  },
+  "components": {
+    "buttons": "Large hit areas (min-h-[56px] for kids). Rounded-full. Playful hover lift (-translate-y-1) and soft shadow.",
+    "cards": "Neumorphic tactile variant or flat with soft diffuse shadows. Crisp inner borders for parents, soft borderless colored blocks for kids.",
+    "icons": "lucide-react with thick stroke (2.5px) for kids.",
+    "crisis_access": "Persistent soft orange floating action button or header item: 'Talk to an Adult' or 'Get Help'. Accessible from every screen."
+  },
+  "motion_and_interactions": {
+    "hover": "Gentle scale (scale-105) and translate-y-1 for interactive kids' cards.",
+    "breathing_exercise": "Framer Motion expanding/contracting circles with soft glows.",
+    "feedback": "Micro-interactions on mood selection, playful bounces on streak/reward completion."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "category": "mascot_inspiration",
+        "url": "https://images.unsplash.com/photo-1535979863199-3c77338429a0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODF8MHwxfHNlYXJjaHwxfHxjdXRlJTIwbGFtYiUyMGNhcnRvb258ZW58MHx8fHwxNzgxOTk5MDQzfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Sunny the Lamb mascot inspiration"
+      },
+      {
+        "category": "kids_dashboard_background",
+        "url": "https://images.unsplash.com/photo-1501630834273-4b5604d2ee31?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTJ8MHwxfHNlYXJjaHwxfHxzdW5ueSUyMHNreSUyMGNsb3Vkc3xlbnwwfHx8fDE3ODE5OTkwNDN8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Soft sunny sky clouds for header or calming background"
+      },
+      {
+        "category": "parent_dashboard_hero",
+        "url": "https://images.unsplash.com/photo-1624272864537-8ecc72b67958?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwxfHxwYXJlbnQlMjBjaGlsZCUyMGhhcHB5fGVufDB8fHx8MTc4MTk5OTA0M3ww&ixlib=rb-4.1.0&q=85",
+        "description": "Parent and child happy connection image for parent dashboard empty states"
+      }
+    ]
+  },
+  "accessibility_and_testing": {
+    "testing_attributes": "All interactive elements MUST include data-testid. Example: data-testid='mood-emoji-happy'.",
+    "text_to_speech": "Visual 'Read Aloud' icon buttons (speaker icon) next to all text blocks in the kid dashboard.",
+    "contrast": "Maintain 4.5:1 ratio even with pastel palettes by using Deep Navy (#1D3557) text, avoiding pure black to reduce cognitive strain."
+  },
+  "instructions_to_main_agent": [
+    "Build the application using React and Tailwind CSS.",
+    "Do not use generic Inter font. Install and apply Fredoka for kid headings and Nunito for body/parents.",
+    "Create two distinct layouts: A highly visual, playful Bento Grid for the Kid Dashboard, and a structured Summary-first layout for the Parent Dashboard.",
+    "For the breathing exercise, implement a smooth Framer Motion expanding/contracting animation.",
+    "Ensure 'Read Aloud' text-to-speech visual cues exist for the AI Chat Buddy and Affirmations.",
+    "Implement the 'Get Help Now' crisis resource gently but prominently using the Soft Orange palette.",
+    "Use the provided image URLs for mascots and backgrounds. Do not use placeholder text or dummy image URLs.",
+    "Add 'data-testid' to all buttons, links, and forms."
+  ]
+}
