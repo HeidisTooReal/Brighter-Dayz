@@ -31,6 +31,13 @@ a companion to BetterDayz.org. Warm, hopeful, safe, and playful.
 ## Testing
 - 22/22 backend pytest pass (/app/backend/tests/test_brighterdayz_api.py). Frontend e2e flows verified.
 
+## Implemented (2026-06-21) — Auth roles, age gate, Parent PIN
+- Switched auth from httpOnly cookies to **Bearer token (localStorage)** — fixes iframe/mobile third-party-cookie 401s. One-time setup; session persists.
+- **Account roles:** `parent` (manages child profiles) and `teen` (self sign-up, age 13+ per Google Play/COPPA). Teen register auto-creates their own profile and routes straight to Kid Mode; under-13 self sign-up blocked with a gentle "ask a parent" message.
+- **Parent PIN** (4–6 digits, bcrypt-hashed): gates the Parent Dashboard so a parent can monitor without re-login and keep kids out. Set/Change PIN from Profiles.
+- New endpoints: /auth/set-pin, /auth/verify-pin; /auth/register accepts role+age; /auth/me & login/register return has_pin.
+- Verified: 33/33 backend + 100% frontend flows (iteration_2 & iteration_3 reports).
+
 ## Backlog / Next
 - P1: Treat each Claude StreamDone as a message boundary in ChatBuddy (cosmetic).
 - P1: Final app name lock (Brighter Dayz working) + optional rename; richer kid-mode rename UX.
