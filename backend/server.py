@@ -831,3 +831,22 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# ---------------------------------------------------------------------------
+# Production: serve the built React app from the same origin (Cloud Run).
+# Inert in the Emergent preview (no frontend/build dir there), so it changes nothing locally.
+# ---------------------------------------------------------------------------
+BUILD_DIR = ROOT_DIR.parent / "frontend" / "build"
+if BUILD_DIR.exists():
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    app.mount("/static", StaticFiles(directory=str(BUILD_DIR / "static")), name="static")
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        candidate = BUILD_DIR / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(BUILD_DIR / "index.html"))
+
