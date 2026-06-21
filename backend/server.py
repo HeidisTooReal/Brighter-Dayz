@@ -13,7 +13,10 @@ from datetime import datetime, timezone, timedelta, date
 
 import jwt
 import bcrypt
-import resend
+import smtplib
+import ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
@@ -37,9 +40,12 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 JWT_ALGORITHM = "HS256"
 MIN_SELF_SIGNUP_AGE = 13   # Google Play / COPPA minimum age for self sign-up without a parent
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
-SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-if RESEND_API_KEY:
-    resend.api_key = RESEND_API_KEY
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '465'))
+SMTP_USER = os.environ.get('SMTP_USER')           # full Google Workspace email
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')   # Gmail App Password (16 chars)
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL') or SMTP_USER
+EMAIL_ENABLED = bool(SMTP_USER and SMTP_PASSWORD)
 
 app = FastAPI(title="Brighter Dayz API")
 api_router = APIRouter(prefix="/api")
@@ -327,24 +333,40 @@ def alert_email_html(parent_name: str, child_name: str, category: str, message: 
       </td></tr>
     </table>"""
 
+def _send_email_blocking(to_email: str, subject: str, html: str):
+    msg = MIMEMultipart("alternative")
+    msg["From"] = f"Brighter Dayz <{SENDER_EMAIL}>"
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html, "html", "utf-8"))
+    ctx = ssl.create_default_context()
+    if SMTP_PORT == 465:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx, timeout=20) as server:
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
+    else:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+            server.starttls(context=ctx)
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SENDER_EMAIL, [to_email], msg.as_string())
+
 async def send_parent_alert(parent: dict, child: dict, message: str, assessment: dict):
     alert = {"id": str(uuid.uuid4()), "parent_id": str(parent["_id"]), "child_id": child["id"],
              "child_name": child.get("name"), "category": assessment.get("category"),
              "reason": assessment.get("reason"), "message": message[:500],
              "emailed": False, "read": False,
              "created_at": datetime.now(timezone.utc).isoformat()}
-    if RESEND_API_KEY and parent.get("email"):
+    if EMAIL_ENABLED and parent.get("email"):
         try:
-            params = {"from": SENDER_EMAIL, "to": [parent["email"]],
-                      "subject": f"💛 Please check in with {child.get('name')} — Brighter Dayz",
-                      "html": alert_email_html(parent.get("name"), child.get("name"),
-                                               assessment.get("category"), message, assessment.get("reason"))}
-            await asyncio.to_thread(resend.Emails.send, params)
+            subject = f"💛 Please check in with {child.get('name')} — Brighter Dayz"
+            html = alert_email_html(parent.get("name"), child.get("name"),
+                                    assessment.get("category"), message, assessment.get("reason"))
+            await asyncio.to_thread(_send_email_blocking, parent["email"], subject, html)
             alert["emailed"] = True
         except Exception:
             logger.exception("parent alert email failed")
     else:
-        logger.warning("RESEND_API_KEY not set — alert stored but email not sent")
+        logger.warning("SMTP not configured — alert stored but email not sent")
     await db.alerts.insert_one(alert)
 
 async def safety_monitor(child: dict, message: str):
