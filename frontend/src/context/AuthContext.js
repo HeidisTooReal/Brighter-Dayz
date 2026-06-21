@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!getToken()) { setUser(false); return; }
     api.get("/auth/me").then((r) => setUser(r.data)).catch(() => { setToken(null); setUser(false); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (email, password) => {
@@ -25,7 +26,7 @@ export function AuthProvider({ children }) {
     return data;
   };
   const logout = async () => {
-    try { await api.post("/auth/logout"); } catch (e) {}
+    try { await api.post("/auth/logout"); } catch (e) { console.error("Logout request failed:", e); }
     setToken(null);
     setUser(false);
   };

@@ -23,7 +23,7 @@ export default function ReadAloud({ text, voice = "coral", className = "", label
       await audio.play();
       setPlaying(true);
     } catch (e) {
-      // silent fail, read aloud optional
+      console.warn("Read aloud unavailable:", e);
     } finally {
       setLoading(false);
     }

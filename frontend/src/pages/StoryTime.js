@@ -20,6 +20,7 @@ export default function StoryTime() {
   useEffect(() => {
     api.get(`/children/${childId}`).then((r) => setChild(r.data));
     api.get(`/children/${childId}/stories`).then((r) => setSaved(r.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
 
   const generate = async () => {

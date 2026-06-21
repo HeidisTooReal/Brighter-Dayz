@@ -19,6 +19,7 @@ export default function Breathe() {
   const [cycles, setCycles] = useState(0);
   const timer = useRef(null);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { api.get(`/children/${childId}`).then((r) => setChild(r.data)); }, [childId]);
 
   const ex = EXERCISES[type];
@@ -35,13 +36,17 @@ export default function Breathe() {
     }
     timer.current = setTimeout(() => setCount((c) => c + 1), 1000);
     return () => clearTimeout(timer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, count, stepIdx]);
 
   const start = () => { setRunning(true); setStepIdx(0); setCount(0); setCycles(0); };
   const stop = async () => {
     setRunning(false);
     clearTimeout(timer.current);
-    if (cycles >= 1) { try { await api.post(`/children/${childId}/activities`, { type: "breathing", detail: ex.name }); } catch (e) {} }
+    if (cycles >= 1) {
+      try { await api.post(`/children/${childId}/activities`, { type: "breathing", detail: ex.name }); }
+      catch (e) { console.error("Failed to log activity:", e); }
+    }
   };
 
   const scale = label === "Breathe In" ? 1.4 : label === "Breathe Out" ? 0.7 : 1;

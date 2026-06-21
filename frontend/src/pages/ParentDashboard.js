@@ -27,6 +27,7 @@ export default function ParentDashboard() {
     }
     setMoodSeries(series);
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   const removeChild = async (id, name) => {

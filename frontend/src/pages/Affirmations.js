@@ -15,6 +15,7 @@ export default function Affirmations() {
   const [feeling, setFeeling] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { api.get(`/children/${childId}`).then((r) => setChild(r.data)); }, [childId]);
 
   const generate = async () => {

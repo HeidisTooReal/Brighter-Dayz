@@ -33,6 +33,7 @@ function TeenHome() {
     api.get("/children").then((r) => {
       if (r.data && r.data[0]) navigate(`/kid/${r.data[0].id}`, { replace: true });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
   return <Loading />;
 }

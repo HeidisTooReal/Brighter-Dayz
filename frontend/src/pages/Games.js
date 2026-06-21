@@ -17,6 +17,7 @@ function WorryBubbles({ childId }) {
       setBubbles((b) => [...b, { id: Math.random(), x: 10 + Math.random() * 80, size: 50 + Math.random() * 50 }].slice(-8));
     }, 900);
     return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pop = async (id) => {
@@ -24,7 +25,10 @@ function WorryBubbles({ childId }) {
     setWord(KIND_WORDS[Math.floor(Math.random() * KIND_WORDS.length)]);
     const n = popped + 1;
     setPopped(n);
-    if (n === 5) { try { await api.post(`/children/${childId}/activities`, { type: "game", detail: "Worry Bubbles" }); } catch (e) {} }
+    if (n === 5) {
+      try { await api.post(`/children/${childId}/activities`, { type: "game", detail: "Worry Bubbles" }); }
+      catch (e) { console.error("Failed to log activity:", e); }
+    }
   };
 
   return (
@@ -59,10 +63,13 @@ function GratitudeGarden({ childId }) {
 
   const add = async () => {
     if (!val.trim()) return;
-    const next = [...items, val.trim()];
+    const next = [...items, { id: Math.random().toString(36).slice(2), text: val.trim() }];
     setItems(next);
     setVal("");
-    if (next.length === 3) { try { await api.post(`/children/${childId}/activities`, { type: "game", detail: "Gratitude Garden" }); } catch (e) {} }
+    if (next.length === 3) {
+      try { await api.post(`/children/${childId}/activities`, { type: "game", detail: "Gratitude Garden" }); }
+      catch (e) { console.error("Failed to log activity:", e); }
+    }
   };
 
   return (
@@ -91,6 +98,7 @@ export default function Games() {
   const { childId } = useParams();
   const [child, setChild] = useState(null);
   const [game, setGame] = useState(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { api.get(`/children/${childId}`).then((r) => setChild(r.data)); }, [childId]);
 
   return (

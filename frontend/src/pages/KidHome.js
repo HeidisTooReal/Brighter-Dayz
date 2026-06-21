@@ -32,6 +32,7 @@ export default function KidHome() {
   useEffect(() => {
     loadChild();
     api.get("/daily").then((r) => setDaily(r.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
 
   const pickMood = async (key) => {
@@ -39,7 +40,7 @@ export default function KidHome() {
     try {
       const { data } = await api.post(`/children/${childId}/moods`, { mood: key });
       setChild(data.child);
-    } catch (e) {}
+    } catch (e) { console.error("Failed to log mood:", e); }
   };
 
   if (!child) return <KidShell><div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-[#457B9D]" /></div></KidShell>;

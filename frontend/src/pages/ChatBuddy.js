@@ -7,6 +7,7 @@ import { ASSETS } from "@/lib/assets";
 import { Send, Loader2 } from "lucide-react";
 
 const STARTERS = ["I feel sad today", "I'm scared", "Tell me something happy", "I had a hard day"];
+const uid = () => Math.random().toString(36).slice(2);
 
 export default function ChatBuddy() {
   const { childId } = useParams();
@@ -18,7 +19,8 @@ export default function ChatBuddy() {
 
   useEffect(() => {
     api.get(`/children/${childId}`).then((r) => setChild(r.data));
-    api.get(`/children/${childId}/chat/history`).then((r) => setMessages(r.data.map((m) => ({ role: m.role, text: m.text }))));
+    api.get(`/children/${childId}/chat/history`).then((r) => setMessages(r.data.map((m) => ({ role: m.role, text: m.text, id: uid() }))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
@@ -28,7 +30,7 @@ export default function ChatBuddy() {
     if (!msg || sending) return;
     setInput("");
     setSending(true);
-    setMessages((m) => [...m, { role: "user", text: msg }, { role: "assistant", text: "" }]);
+    setMessages((m) => [...m, { role: "user", text: msg, id: uid() }, { role: "assistant", text: "", id: uid() }]);
     try {
       const res = await fetch(`${API}/children/${childId}/chat`, {
         method: "POST",
@@ -44,14 +46,15 @@ export default function ChatBuddy() {
         const chunk = decoder.decode(value, { stream: true });
         setMessages((m) => {
           const copy = [...m];
-          copy[copy.length - 1] = { role: "assistant", text: copy[copy.length - 1].text + chunk };
+          copy[copy.length - 1] = { ...copy[copy.length - 1], text: copy[copy.length - 1].text + chunk };
           return copy;
         });
       }
     } catch (e) {
+      console.error("Chat request failed:", e);
       setMessages((m) => {
         const copy = [...m];
-        copy[copy.length - 1] = { role: "assistant", text: "I'm here for you, friend. 💛" };
+        copy[copy.length - 1] = { ...copy[copy.length - 1], text: "I'm here for you, friend. 💛" };
         return copy;
       });
     } finally { setSending(false); }
@@ -68,7 +71,7 @@ export default function ChatBuddy() {
             </div>
           )}
           {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} items-end gap-2`}>
+            <div key={m.id || i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} items-end gap-2`}>
               {m.role === "assistant" && <img src={ASSETS.sunny} alt="" className="h-9 w-9 object-contain" />}
               <div data-testid={`chat-msg-${m.role}`}
                 className={`max-w-[80%] rounded-3xl px-4 py-3 text-lg ${m.role === "user" ? "bg-[#457B9D] text-white rounded-br-md" : "bg-white text-[#1D3557] shadow-sm rounded-bl-md"}`}>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
@@ -23,6 +23,7 @@ export default function Badges() {
   useEffect(() => {
     api.get(`/children/${childId}`).then((r) => setChild(r.data));
     api.get(`/children/${childId}/rewards`).then((r) => setData(r.data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childId]);
 
   const earned = new Set(data?.badges || []);

@@ -34,7 +34,8 @@ export default function Profiles() {
   };
   useEffect(() => {
     load();
-    api.get("/auth/me").then((r) => setHasPin(!!r.data.has_pin)).catch(() => {});
+    api.get("/auth/me").then((r) => setHasPin(!!r.data.has_pin)).catch((e) => console.error("Failed to load PIN status:", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addChild = async (e) => {
