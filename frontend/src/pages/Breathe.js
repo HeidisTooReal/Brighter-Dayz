@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import KidShell from "@/components/KidShell";
-import { Volume2, VolumeX, Loader2 } from "lucide-react";
+import { Volume2, VolumeX, Loader2, Bell, BellOff } from "lucide-react";
 
 // Gentle, short holds for little ones (<= 8). Calmer, longer for older kids.
 const YOUNG_EXERCISES = {
@@ -30,9 +30,56 @@ export default function Breathe() {
   const [count, setCount] = useState(0);
   const [cycles, setCycles] = useState(0);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [chimeOn, setChimeOn] = useState(true);
   const [preparing, setPreparing] = useState(false);
   const timer = useRef(null);
   const voiceRef = useRef({});
+  const audioCtxRef = useRef(null);
+  const padRef = useRef(null);
+
+  const getCtx = () => {
+    if (!audioCtxRef.current) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      audioCtxRef.current = new AC();
+    }
+    return audioCtxRef.current;
+  };
+  const playChime = (freq) => {
+    try {
+      const ctx = getCtx();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.14, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.9);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 2.0);
+    } catch (e) { /* audio not available */ }
+  };
+  const startPad = () => {
+    try {
+      const ctx = getCtx();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.035;
+      const o1 = ctx.createOscillator(); o1.type = "sine"; o1.frequency.value = 220;
+      const o2 = ctx.createOscillator(); o2.type = "sine"; o2.frequency.value = 329.6;
+      o1.connect(gain); o2.connect(gain); gain.connect(ctx.destination);
+      o1.start(); o2.start();
+      padRef.current = { o1, o2 };
+    } catch (e) { /* audio not available */ }
+  };
+  const stopPad = () => {
+    if (padRef.current) {
+      try { padRef.current.o1.stop(); padRef.current.o2.stop(); } catch (e) {}
+      padRef.current = null;
+    }
+  };
+
+  useEffect(() => () => { stopPad(); }, []);
 
   useEffect(() => {
     api.get(`/children/${childId}`).then((r) => {
@@ -62,11 +109,17 @@ export default function Breathe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, count, stepIdx]);
 
-  // Speak the current step when it changes (voice guidance)
+  // Speak the current step + soft chime when it changes
   useEffect(() => {
-    if (!running || !voiceOn) return;
-    const url = voiceRef.current[label];
-    if (url) { const a = new Audio(url); a.play().catch(() => {}); }
+    if (!running) return;
+    if (voiceOn) {
+      const url = voiceRef.current[label];
+      if (url) { const a = new Audio(url); a.play().catch(() => {}); }
+    }
+    if (chimeOn) {
+      const freq = /in|smell/i.test(label) ? 528 : /out|blow/i.test(label) ? 396 : 432;
+      playChime(freq);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIdx, running]);
 
@@ -83,12 +136,15 @@ export default function Breathe() {
   };
 
   const start = async () => {
+    try { await getCtx().resume(); } catch (e) {}
     if (voiceOn) { setPreparing(true); await prepareVoice(); setPreparing(false); }
+    if (chimeOn) startPad();
     setStepIdx(0); setCount(0); setCycles(0); setRunning(true);
   };
   const stop = async () => {
     setRunning(false);
     clearTimeout(timer.current);
+    stopPad();
     if (cycles >= 1) {
       try { await api.post(`/children/${childId}/activities`, { type: "breathing", detail: ex.name }); }
       catch (e) { console.error("Failed to log activity:", e); }
@@ -111,6 +167,11 @@ export default function Breathe() {
             className={`inline-flex items-center gap-1 rounded-full px-4 py-2 font-semibold transition ${voiceOn ? "bg-[#457B9D] text-white" : "bg-white text-[#457B9D] shadow-sm"}`}>
             {voiceOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
             {voiceOn ? "Voice on" : "Voice off"}
+          </button>
+          <button data-testid="breathe-chime-toggle" disabled={running} onClick={() => setChimeOn((v) => !v)}
+            className={`inline-flex items-center gap-1 rounded-full px-4 py-2 font-semibold transition ${chimeOn ? "bg-[#52b788] text-white" : "bg-white text-[#457B9D] shadow-sm"}`}>
+            {chimeOn ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+            {chimeOn ? "Chime on" : "Chime off"}
           </button>
         </div>
 
