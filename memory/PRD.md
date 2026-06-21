@@ -28,6 +28,16 @@ a companion to BetterDayz.org. Warm, hopeful, safe, and playful.
 - Parent Dashboard — per-child last mood, activity count, stars, streak, mood-trend chart, recent check-ins, delete.
 - Mascot art (Sunny the lamb) + animated Jesus/Good Shepherd (Chosen-Adventures style) generated.
 
+## Implemented (2026-06-21) — Faith refuge features
+- **Prayer Corner** ("Talk to God"): write/save prayers with gentle prompts, an AI "Help me pray" generator (Claude), read-aloud, delete; saving awards stars. Endpoints: /prayer/generate, /children/{id}/prayers (CRUD).
+- **God's Promises** (Scripture Library): 8 comforting verse sets grouped by feeling (scared, sad, worried, lonely, angry, courage, thankful, loved), each read-aloud. Endpoint: /scriptures.
+- **Badge-unlock confetti** celebration on Kid Home when a mood check-in crosses a star threshold into a new badge. Verified 100% (iteration_5).
+- Kid Home now has 8 activity tiles. Good Shepherd / animated Jesus art used in Promises + Story Time.
+
+## Code quality (2026-06-21)
+- Empty catch blocks now log; stable React keys for chat messages + gratitude items; intentional mount-effects lint-silenced; zero compile warnings.
+- Note: token kept in localStorage (Bearer) by design — httpOnly cookies fail in the cross-origin Preview iframe on Safari.
+
 ## Testing
 - 22/22 backend pytest pass (/app/backend/tests/test_brighterdayz_api.py). Frontend e2e flows verified.
 
