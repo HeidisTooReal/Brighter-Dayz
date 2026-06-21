@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import KidShell from "@/components/KidShell";
 import ReadAloud from "@/components/ReadAloud";
 import { ASSETS, MOODS, MOOD_REPLIES } from "@/lib/assets";
-import { MessageCircleHeart, Wind, BookOpen, Sparkles, Gamepad2, Loader2 } from "lucide-react";
+import { MessageCircleHeart, Wind, BookOpen, Sparkles, Gamepad2, Award, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const TILES = [
@@ -13,6 +13,7 @@ const TILES = [
   { key: "story", to: "story", label: "Story Time", icon: BookOpen, bg: "#FFE3B3", span: "" },
   { key: "affirmations", to: "affirmations", label: "Happy Words", icon: Sparkles, bg: "#FFD9D4", span: "" },
   { key: "games", to: "games", label: "Calm Games", icon: Gamepad2, bg: "#CDEAFE", span: "" },
+  { key: "badges", to: "badges", label: "My Badges", icon: Award, bg: "#FCE7A0", span: "" },
 ];
 
 export default function KidHome() {

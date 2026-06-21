@@ -58,3 +58,15 @@ input[type="range"] {
         @apply border-border;
     }
 }
+
+@media print {
+    body * { visibility: hidden !important; }
+    #certificate, #certificate * { visibility: visible !important; }
+    #certificate {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none !important;
+    }
+}
