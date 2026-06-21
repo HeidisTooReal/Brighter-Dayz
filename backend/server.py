@@ -204,8 +204,9 @@ async def register(data: RegisterInput, response: Response):
            "created_at": datetime.now(timezone.utc).isoformat()}
     res = await db.users.insert_one(doc)
     uid = str(res.inserted_id)
-    set_auth_cookie(response, create_access_token(uid, email))
-    return {"id": uid, "name": doc["name"], "email": email, "role": "parent"}
+    token = create_access_token(uid, email)
+    set_auth_cookie(response, token)
+    return {"id": uid, "name": doc["name"], "email": email, "role": "parent", "token": token}
 
 @api_router.post("/auth/login")
 async def login(data: LoginInput, response: Response):
@@ -214,8 +215,9 @@ async def login(data: LoginInput, response: Response):
     if not user or not verify_password(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Wrong email or password.")
     uid = str(user["_id"])
-    set_auth_cookie(response, create_access_token(uid, email))
-    return {"id": uid, "name": user.get("name"), "email": email, "role": user.get("role", "parent")}
+    token = create_access_token(uid, email)
+    set_auth_cookie(response, token)
+    return {"id": uid, "name": user.get("name"), "email": email, "role": user.get("role", "parent"), "token": token}
 
 @api_router.post("/auth/logout")
 async def logout(response: Response):

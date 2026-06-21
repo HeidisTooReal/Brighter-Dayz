@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import api, { API } from "@/lib/api";
+import api, { API, authHeaders } from "@/lib/api";
 import KidShell from "@/components/KidShell";
 import ReadAloud from "@/components/ReadAloud";
 import { ASSETS } from "@/lib/assets";
@@ -32,7 +32,7 @@ export default function ChatBuddy() {
     try {
       const res = await fetch(`${API}/children/${childId}/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         credentials: "include",
         body: JSON.stringify({ message: msg }),
       });
