@@ -15,6 +15,7 @@ import Games from "@/pages/Games";
 import Badges from "@/pages/Badges";
 import PrayerCorner from "@/pages/PrayerCorner";
 import Promises from "@/pages/Promises";
+import Privacy from "@/pages/Privacy";
 import Crisis from "@/pages/Crisis";
 import ParentDashboard from "@/pages/ParentDashboard";
 
@@ -66,6 +67,7 @@ function App() {
             <Route path="/kid/:childId/prayer" element={<Protected><PrayerCorner /></Protected>} />
             <Route path="/kid/:childId/promises" element={<Protected><Promises /></Protected>} />
             <Route path="/help" element={<Crisis />} />
+            <Route path="/privacy" element={<Privacy />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

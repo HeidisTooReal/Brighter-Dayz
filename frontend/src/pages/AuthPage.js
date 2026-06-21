@@ -114,6 +114,11 @@ export default function AuthPage() {
             </button>
           </form>
           {mode === "login" && <p className="mt-4 text-center text-sm text-[#457B9D]">Demo: parent@brighterdayz.org / Sunshine123</p>}
+          <p className="mt-6 text-center text-xs text-[#94a3b8]">
+            By continuing you agree to our{" "}
+            <a href="/privacy" data-testid="privacy-link" className="font-semibold text-[#457B9D] underline">Privacy Policy</a>.
+            Accounts are set up and supervised by a parent or guardian.
+          </p>
         </div>
       </div>
     </div>
