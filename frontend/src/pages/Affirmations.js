@@ -48,7 +48,7 @@ export default function Affirmations() {
             <motion.div key={text} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
               data-testid="affirmation-text" className="rounded-3xl bg-white p-8 shadow-sm mb-5">
               <p className="font-fredoka text-2xl md:text-3xl font-bold text-[#1D3557] leading-snug">"{text}"</p>
-              <div className="mt-4 flex justify-center"><ReadAloud text={text} voice="onyx" label="Hear it" testid="affirmation-read-btn" /></div>
+              <div className="mt-4 flex justify-center"><ReadAloud text={text} voice="ash" label="Hear it" testid="affirmation-read-btn" /></div>
             </motion.div>
           )}
         </AnimatePresence>

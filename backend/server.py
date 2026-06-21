@@ -7,10 +7,13 @@ import os
 import logging
 import uuid
 import secrets
+import json
+import asyncio
 from datetime import datetime, timezone, timedelta, date
 
 import jwt
 import bcrypt
+import resend
 from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
@@ -33,6 +36,10 @@ EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 JWT_ALGORITHM = "HS256"
 MIN_SELF_SIGNUP_AGE = 13   # Google Play / COPPA minimum age for self sign-up without a parent
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 app = FastAPI(title="Brighter Dayz API")
 api_router = APIRouter(prefix="/api")
@@ -133,7 +140,8 @@ class StoryInput(BaseModel):
 
 class TTSInput(BaseModel):
     text: str
-    voice: str = "onyx"
+    voice: str = "ash"
+    speed: float = 1.12
 
 class ActivityInput(BaseModel):
     type: str          # breathing | game | story | affirmation | chat
@@ -260,6 +268,93 @@ def make_chat(session_id: str, system_prompt: str) -> LlmChat:
                    system_message=system_prompt).with_model("anthropic", "claude-sonnet-4-6")
 
 # ---------------------------------------------------------------------------
+# Child safety monitoring — detect alarming messages & alert the parent
+# ---------------------------------------------------------------------------
+SAFETY_SYSTEM = (
+    "You are a child-safety classifier for a children's mental-health app. "
+    "You read a single message a child typed and judge whether the child may be in danger "
+    "or serious distress that a parent/guardian must be told about right away. "
+    "Categories: self_harm (thoughts of suicide, wanting to die, hurting themselves), "
+    "abuse (someone is hurting them, hitting them, touching them inappropriately, or they feel unsafe at home), "
+    "violence (wanting to seriously hurt someone else), "
+    "severe_distress (extreme hopelessness, running away, says they are not safe). "
+    "Respond with ONLY a compact JSON object and nothing else: "
+    '{"risk":"none|high","category":"<one of the above or none>","reason":"<short reason>"}. '
+    "Use \"high\" for ANY mention of self-harm, suicide, abuse, being unsafe, or wanting to seriously hurt someone. "
+    "Use \"none\" for ordinary sad, worried, angry, or lonely feelings that do NOT indicate danger."
+)
+
+async def assess_risk(message: str) -> dict:
+    try:
+        chat = make_chat(f"safety-{uuid.uuid4()}", SAFETY_SYSTEM)
+        resp = await chat.send_message(UserMessage(text=message))
+        raw = (resp or "").strip()
+        start, end = raw.find("{"), raw.rfind("}")
+        if start != -1 and end != -1:
+            data = json.loads(raw[start:end + 1])
+            return {"risk": data.get("risk", "none"), "category": data.get("category", "none"),
+                    "reason": data.get("reason", "")}
+    except Exception:
+        logger.exception("risk assessment failed")
+    return {"risk": "none", "category": "none", "reason": ""}
+
+def alert_email_html(parent_name: str, child_name: str, category: str, message: str, reason: str) -> str:
+    cat_label = {"self_harm": "possible self-harm or suicidal thoughts",
+                 "abuse": "possible abuse or feeling unsafe",
+                 "violence": "thoughts of hurting someone",
+                 "severe_distress": "severe distress"}.get(category, "something concerning")
+    return f"""
+    <table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif;background:#FFF6F4;padding:24px;">
+      <tr><td>
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #eee;">
+          <tr><td style="background:#FFA69E;padding:20px 24px;color:#7A2E26;font-size:20px;font-weight:bold;">Brighter Dayz — A gentle heads-up 💛</td></tr>
+          <tr><td style="padding:24px;color:#1D3557;font-size:16px;line-height:1.6;">
+            <p>Hi {parent_name or 'there'},</p>
+            <p><b>{child_name}</b> just shared something with Sunny that may need your loving attention — it sounded like <b>{cat_label}</b>.</p>
+            <p style="background:#FFF1EF;border-left:4px solid #FFA69E;padding:12px 16px;border-radius:8px;"><i>"{message}"</i></p>
+            <p>Please gently check in with {child_name} as soon as you can. A calm, caring conversation can mean everything.</p>
+            <p style="background:#EAF2F8;padding:14px 16px;border-radius:8px;">
+              <b>If they may be in danger:</b><br/>
+              • Call or text <b>988</b> (Suicide &amp; Crisis Lifeline)<br/>
+              • Text <b>HOME</b> to <b>741741</b> (Crisis Text Line)<br/>
+              • Childhelp: <b>1-800-422-4453</b><br/>
+              • If there is immediate danger, call <b>911</b>.
+            </p>
+            <p style="color:#457B9D;">"The Lord is close to the brokenhearted." — Psalm 34:18</p>
+            <p style="color:#94a3b8;font-size:13px;">You're receiving this because Brighter Dayz watches over your child's messages for safety. We're praying for your family.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>"""
+
+async def send_parent_alert(parent: dict, child: dict, message: str, assessment: dict):
+    alert = {"id": str(uuid.uuid4()), "parent_id": str(parent["_id"]), "child_id": child["id"],
+             "child_name": child.get("name"), "category": assessment.get("category"),
+             "reason": assessment.get("reason"), "message": message[:500],
+             "emailed": False, "read": False,
+             "created_at": datetime.now(timezone.utc).isoformat()}
+    if RESEND_API_KEY and parent.get("email"):
+        try:
+            params = {"from": SENDER_EMAIL, "to": [parent["email"]],
+                      "subject": f"💛 Please check in with {child.get('name')} — Brighter Dayz",
+                      "html": alert_email_html(parent.get("name"), child.get("name"),
+                                               assessment.get("category"), message, assessment.get("reason"))}
+            await asyncio.to_thread(resend.Emails.send, params)
+            alert["emailed"] = True
+        except Exception:
+            logger.exception("parent alert email failed")
+    else:
+        logger.warning("RESEND_API_KEY not set — alert stored but email not sent")
+    await db.alerts.insert_one(alert)
+
+async def safety_monitor(child: dict, message: str):
+    assessment = await assess_risk(message)
+    if assessment.get("risk") == "high":
+        parent = await db.users.find_one({"_id": ObjectId(child["parent_id"])})
+        if parent:
+            await send_parent_alert(parent, child, message, assessment)
+
+# ---------------------------------------------------------------------------
 # Auth routes
 # ---------------------------------------------------------------------------
 
@@ -372,6 +467,7 @@ async def delete_child(child_id: str, user: dict = Depends(get_current_user)):
     await db.stories.delete_many({"child_id": child_id})
     await db.activities.delete_many({"child_id": child_id})
     await db.prayers.delete_many({"child_id": child_id})
+    await db.alerts.delete_many({"child_id": child_id})
     return {"ok": True}
 
 # ---------------------------------------------------------------------------
@@ -476,6 +572,9 @@ async def chat(child_id: str, data: ChatInput, user: dict = Depends(get_current_
     now = datetime.now(timezone.utc).isoformat()
     await db.chat_messages.insert_one({"child_id": child_id, "role": "user",
                                        "text": data.message, "created_at": now})
+
+    # Fire-and-forget safety check: alerts the parent if the message is alarming.
+    asyncio.create_task(safety_monitor(child, data.message))
 
     history = await db.chat_messages.find({"child_id": child_id}, {"_id": 0}).sort("created_at", 1).to_list(200)
     recent = history[-12:-1] if len(history) > 1 else []
@@ -628,7 +727,7 @@ async def tts(data: TTSInput, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Nothing to read")
     try:
         engine = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
-        audio_b64 = await engine.generate_speech_base64(text=text, model="tts-1", voice=data.voice)
+        audio_b64 = await engine.generate_speech_base64(text=text, model="tts-1", voice=data.voice, speed=data.speed)
         return {"audio": f"data:audio/mp3;base64,{audio_b64}"}
     except Exception as e:
         logger.exception("tts failed")
@@ -647,7 +746,18 @@ async def parent_overview(user: dict = Depends(get_current_user)):
         acts = await db.activities.count_documents({"child_id": c["id"]})
         result.append({"child": c, "recent_moods": moods[:7], "mood_count": len(moods),
                        "activity_count": acts, "last_mood": moods[0] if moods else None})
-    return {"children": result}
+    unread_alerts = await db.alerts.count_documents({"parent_id": user["_id"], "read": False})
+    return {"children": result, "unread_alerts": unread_alerts}
+
+@api_router.get("/parent/alerts")
+async def parent_alerts(user: dict = Depends(get_current_user)):
+    alerts = await db.alerts.find({"parent_id": user["_id"]}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return alerts
+
+@api_router.post("/parent/alerts/{alert_id}/read")
+async def mark_alert_read(alert_id: str, user: dict = Depends(get_current_user)):
+    await db.alerts.update_one({"id": alert_id, "parent_id": user["_id"]}, {"$set": {"read": True}})
+    return {"ok": True}
 
 @api_router.get("/")
 async def root():

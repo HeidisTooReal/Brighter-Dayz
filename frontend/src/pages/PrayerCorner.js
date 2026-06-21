@@ -81,7 +81,7 @@ export default function PrayerCorner() {
               className="inline-flex items-center gap-2 rounded-full bg-[#E8DFF5] px-4 py-2 font-semibold text-[#5b3f8a] transition hover:-translate-y-0.5 disabled:opacity-60">
               {helping ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />} Help me pray
             </button>
-            {text.trim() && <ReadAloud text={text} voice="onyx" label="Read it" testid="prayer-read" />}
+            {text.trim() && <ReadAloud text={text} voice="ash" label="Read it" testid="prayer-read" />}
             <button data-testid="prayer-save" onClick={save} disabled={saving || !text.trim()}
               className="ml-auto inline-flex items-center gap-2 rounded-full bg-[#457B9D] px-6 py-2 font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-50">
               {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />} Amen

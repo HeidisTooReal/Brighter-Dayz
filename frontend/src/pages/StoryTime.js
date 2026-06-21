@@ -67,7 +67,7 @@ export default function StoryTime() {
           <div data-testid="story-output" className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3 mb-3">
               <h2 className="font-fredoka text-2xl font-bold text-[#1D3557]">{story.title}</h2>
-              <ReadAloud text={`${story.title}. ${story.body}`} voice="onyx" label="Read aloud" testid="story-read" />
+              <ReadAloud text={`${story.title}. ${story.body}`} voice="ash" label="Read aloud" testid="story-read" />
             </div>
             <div className="prose text-lg leading-relaxed text-[#1D3557] whitespace-pre-line">{story.body}</div>
           </div>

@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { ASSETS, MOODS, MOOD_SCORE } from "@/lib/assets";
-import { ArrowLeft, Trash2, Star, Flame, Activity, Smile, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, Star, Flame, Activity, Smile, Loader2, ShieldAlert, Check } from "lucide-react";
 
 const moodMeta = (key) => MOODS.find((m) => m.key === key) || { emoji: "🙂", label: key, color: "#ccc" };
 
@@ -13,10 +13,12 @@ export default function ParentDashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [moodSeries, setMoodSeries] = useState({});
+  const [alerts, setAlerts] = useState([]);
 
   const load = async () => {
     const { data } = await api.get("/parent/overview");
     setData(data);
+    api.get("/parent/alerts").then((r) => setAlerts(r.data)).catch(() => {});
     const series = {};
     for (const item of data.children) {
       const moods = await api.get(`/children/${item.child.id}/moods`).then((r) => r.data);
@@ -34,6 +36,11 @@ export default function ParentDashboard() {
     if (!window.confirm(`Remove ${name}'s profile and all their data?`)) return;
     await api.delete(`/children/${id}`);
     load();
+  };
+
+  const dismissAlert = async (id) => {
+    try { await api.post(`/parent/alerts/${id}/read`); setAlerts((a) => a.filter((x) => x.id !== id)); }
+    catch (e) { console.error("Failed to dismiss alert:", e); }
   };
 
   if (!data) return <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]"><Loader2 className="h-10 w-10 animate-spin text-[#457B9D]" /></div>;
@@ -55,6 +62,33 @@ export default function ParentDashboard() {
             <p className="text-[#64748b]">A gentle window into your child's well-being.</p>
           </div>
         </div>
+
+        {alerts.length > 0 && (
+          <div data-testid="safety-alerts" className="mb-8 rounded-2xl border-2 border-[#FFA69E] bg-[#FFF6F4] p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldAlert className="h-6 w-6 text-[#c0392b]" />
+              <h2 className="text-lg font-bold text-[#7A2E26] font-['Nunito']">Safety alerts — please check in</h2>
+            </div>
+            <div className="space-y-3">
+              {alerts.map((a) => (
+                <div key={a.id} data-testid={`alert-${a.id}`} className="rounded-xl bg-white p-4 shadow-sm border border-[#FFD9D4]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-[#1D3557]">{a.child_name} <span className="ml-1 rounded-full bg-[#FFE3E0] px-2 py-0.5 text-xs font-semibold text-[#c0392b]">{(a.category || "concern").replace("_", " ")}</span></p>
+                      <p className="mt-1 text-[#457B9D] italic">"{a.message}"</p>
+                      <p className="mt-1 text-xs text-[#94a3b8]">{new Date(a.created_at).toLocaleString()} {a.emailed ? "· emailed to you" : "· (email not configured)"}</p>
+                    </div>
+                    <button data-testid={`alert-dismiss-${a.id}`} onClick={() => dismissAlert(a.id)}
+                      className="flex items-center gap-1 rounded-full bg-[#F1F5F9] px-3 py-1.5 text-sm font-semibold text-[#1D3557] hover:bg-[#e2e8f0]">
+                      <Check className="h-4 w-4" /> Reviewed
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs text-[#457B9D]">If they may be in danger: call/text <b>988</b>, text HOME to <b>741741</b>, or call <b>911</b>.</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {data.children.length === 0 && (
           <div className="rounded-xl bg-white p-10 text-center shadow-sm">

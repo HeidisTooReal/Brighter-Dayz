@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { Volume2, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 
-export default function ReadAloud({ text, voice = "onyx", className = "", label = "Read to me", testid = "read-aloud-btn" }) {
+export default function ReadAloud({ text, voice = "ash", className = "", label = "Read to me", testid = "read-aloud-btn" }) {
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef(null);
