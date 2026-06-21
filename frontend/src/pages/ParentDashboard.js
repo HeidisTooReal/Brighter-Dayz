@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { ASSETS, MOODS, MOOD_SCORE } from "@/lib/assets";
 import { ArrowLeft, Trash2, Star, Flame, Activity, Smile, Loader2, ShieldAlert, Check } from "lucide-react";
+import LegalFooter from "@/components/LegalFooter";
 
 const moodMeta = (key) => MOODS.find((m) => m.key === key) || { emoji: "🙂", label: key, color: "#ccc" };
 
@@ -151,6 +152,7 @@ export default function ParentDashboard() {
             </div>
           ))}
         </div>
+        <LegalFooter />
       </div>
     </div>
   );

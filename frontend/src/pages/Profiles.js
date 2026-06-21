@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
 import { Plus, LayoutDashboard, LogOut, Loader2, Lock, ShieldCheck } from "lucide-react";
+import LegalFooter from "@/components/LegalFooter";
 
 const AVATARS = ["🐑", "🦁", "🐻", "🐰", "🦊", "🐨", "🐼", "🦄"];
 
@@ -176,6 +177,7 @@ export default function Profiles() {
           </div>
         )}
       </div>
+      <LegalFooter />
     </div>
   );
 }
