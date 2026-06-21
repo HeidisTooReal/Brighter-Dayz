@@ -27,10 +27,22 @@ function Protected({ children }) {
   return children;
 }
 
+function TeenHome() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    api.get("/children").then((r) => {
+      if (r.data && r.data[0]) navigate(`/kid/${r.data[0].id}`, { replace: true });
+    });
+  }, [navigate]);
+  return <Loading />;
+}
+
 function Root() {
   const { user } = useAuth();
   if (user === null) return <Loading />;
-  return user ? <Profiles /> : <AuthPage />;
+  if (!user) return <AuthPage />;
+  if (user.role === "teen") return <TeenHome />;
+  return <Profiles />;
 }
 
 function App() {

@@ -18,7 +18,7 @@ export default function Profiles() {
   const [avatar, setAvatar] = useState("🐑");
   const [saving, setSaving] = useState(false);
 
-  const [hasPin, setHasPin] = useState(false);
+  const [hasPin, setHasPin] = useState(!!user?.has_pin);
   const [pinMode, setPinMode] = useState(null); // "set" | "enter" | null
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState("");
