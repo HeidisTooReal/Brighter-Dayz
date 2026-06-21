@@ -41,9 +41,11 @@ export default function KidHome() {
 
   const pickMood = async (key) => {
     setMoodMsg(MOOD_REPLIES[key]);
+    const prevBadges = (child?.badges || []).length;
     try {
       const { data } = await api.post(`/children/${childId}/moods`, { mood: key });
       setChild(data.child);
+      if ((data.child?.badges || []).length > prevBadges) setCelebrate(true);
     } catch (e) { console.error("Failed to log mood:", e); }
   };
 
