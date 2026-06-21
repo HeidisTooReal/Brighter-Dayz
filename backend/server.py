@@ -762,12 +762,26 @@ async def tts(data: TTSInput, user: dict = Depends(get_current_user)):
 @api_router.get("/parent/overview")
 async def parent_overview(user: dict = Depends(get_current_user)):
     children = await db.children.find({"parent_id": user["_id"]}, {"_id": 0}).to_list(50)
+    child_ids = [c["id"] for c in children]
+
+    moods_by_child = {}
+    act_counts = {}
+    if child_ids:
+        all_moods = await db.moods.find({"child_id": {"$in": child_ids}}, {"_id": 0}).sort("created_at", -1).to_list(3000)
+        for m in all_moods:
+            moods_by_child.setdefault(m["child_id"], []).append(m)
+        agg = await db.activities.aggregate([
+            {"$match": {"child_id": {"$in": child_ids}}},
+            {"$group": {"_id": "$child_id", "n": {"$sum": 1}}},
+        ]).to_list(1000)
+        act_counts = {a["_id"]: a["n"] for a in agg}
+
     result = []
     for c in children:
-        moods = await db.moods.find({"child_id": c["id"]}, {"_id": 0}).sort("created_at", -1).to_list(30)
-        acts = await db.activities.count_documents({"child_id": c["id"]})
+        moods = moods_by_child.get(c["id"], [])
         result.append({"child": c, "recent_moods": moods[:7], "mood_count": len(moods),
-                       "activity_count": acts, "last_mood": moods[0] if moods else None})
+                       "activity_count": act_counts.get(c["id"], 0),
+                       "last_mood": moods[0] if moods else None})
     unread_alerts = await db.alerts.count_documents({"parent_id": user["_id"], "read": False})
     return {"children": result, "unread_alerts": unread_alerts}
 
