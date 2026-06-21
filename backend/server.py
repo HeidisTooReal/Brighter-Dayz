@@ -97,6 +97,15 @@ class RegisterInput(BaseModel):
 class PinInput(BaseModel):
     pin: str
 
+class PrayerInput(BaseModel):
+    text: str
+    kind: str = "prayer"   # prayer | thanks | request
+
+class PrayerGenInput(BaseModel):
+    feeling: Optional[str] = None
+    about: Optional[str] = None
+    age: int = 8
+
 class LoginInput(BaseModel):
     email: EmailStr
     password: str
@@ -170,6 +179,60 @@ DAILY_AFFIRMATIONS = [
 
 def todays_index(n: int) -> int:
     return date.today().timetuple().tm_yday % n
+
+# ---------------------------------------------------------------------------
+# Scripture library — comforting verses grouped by feeling (kid-friendly)
+# ---------------------------------------------------------------------------
+SCRIPTURE_LIBRARY = [
+    {"id": "scared", "label": "When I'm Scared", "emoji": "😨", "color": "#FFD9D4", "verses": [
+        {"text": "When I am afraid, I will trust in You.", "ref": "Psalm 56:3"},
+        {"text": "Do not be afraid, for I am with you.", "ref": "Isaiah 41:10"},
+        {"text": "God has not given us a spirit of fear, but of power and love.", "ref": "2 Timothy 1:7"},
+        {"text": "Be strong and brave. The Lord your God is with you wherever you go.", "ref": "Joshua 1:9"},
+    ]},
+    {"id": "sad", "label": "When I'm Sad", "emoji": "😢", "color": "#CDEAFE", "verses": [
+        {"text": "The Lord is close to the brokenhearted.", "ref": "Psalm 34:18"},
+        {"text": "He heals the brokenhearted and bandages their wounds.", "ref": "Psalm 147:3"},
+        {"text": "God will wipe away every tear.", "ref": "Revelation 21:4"},
+        {"text": "Weeping may stay for the night, but joy comes in the morning.", "ref": "Psalm 30:5"},
+    ]},
+    {"id": "worried", "label": "When I'm Worried", "emoji": "😟", "color": "#FFE3B3", "verses": [
+        {"text": "Give all your worries to God, because He cares for you.", "ref": "1 Peter 5:7"},
+        {"text": "Do not worry about tomorrow. God will take care of you.", "ref": "Matthew 6:34"},
+        {"text": "Do not be anxious. Pray, and God's peace will guard your heart.", "ref": "Philippians 4:6-7"},
+        {"text": "Come to me when you are tired, and I will give you rest.", "ref": "Matthew 11:28"},
+    ]},
+    {"id": "lonely", "label": "When I'm Lonely", "emoji": "🥺", "color": "#E8DFF5", "verses": [
+        {"text": "I am with you always.", "ref": "Matthew 28:20"},
+        {"text": "God sets the lonely in families.", "ref": "Psalm 68:6"},
+        {"text": "I will never leave you nor forsake you.", "ref": "Hebrews 13:5"},
+        {"text": "The Lord is my shepherd; I have all that I need.", "ref": "Psalm 23:1"},
+    ]},
+    {"id": "angry", "label": "When I'm Angry", "emoji": "😤", "color": "#FFC7B8", "verses": [
+        {"text": "Be quick to listen, slow to speak, and slow to get angry.", "ref": "James 1:19"},
+        {"text": "A gentle answer turns away anger.", "ref": "Proverbs 15:1"},
+        {"text": "Be kind and forgiving to one another.", "ref": "Ephesians 4:32"},
+        {"text": "Let God's peace rule in your heart.", "ref": "Colossians 3:15"},
+    ]},
+    {"id": "brave", "label": "When I Need Courage", "emoji": "🦁", "color": "#FFE08A", "verses": [
+        {"text": "I can do all things through Christ who gives me strength.", "ref": "Philippians 4:13"},
+        {"text": "God is my strength and my shield.", "ref": "Psalm 28:7"},
+        {"text": "Be strong and courageous. Do not be afraid.", "ref": "Deuteronomy 31:6"},
+        {"text": "The Lord is my light and my salvation—whom shall I fear?", "ref": "Psalm 27:1"},
+    ]},
+    {"id": "thankful", "label": "When I'm Thankful", "emoji": "😄", "color": "#A0E7B0", "verses": [
+        {"text": "Give thanks to the Lord, for He is good!", "ref": "Psalm 107:1"},
+        {"text": "Every good gift comes from God.", "ref": "James 1:17"},
+        {"text": "This is the day the Lord has made; let us rejoice!", "ref": "Psalm 118:24"},
+        {"text": "Give thanks in all circumstances.", "ref": "1 Thessalonians 5:18"},
+    ]},
+    {"id": "loved", "label": "When I Forget I'm Loved", "emoji": "💛", "color": "#FFD8E4", "verses": [
+        {"text": "I have loved you with an everlasting love.", "ref": "Jeremiah 31:3"},
+        {"text": "You are wonderfully made.", "ref": "Psalm 139:14"},
+        {"text": "See how much the Father loves us—He calls us His children!", "ref": "1 John 3:1"},
+        {"text": "Nothing can ever separate us from God's love.", "ref": "Romans 8:38-39"},
+    ]},
+]
 
 # ---------------------------------------------------------------------------
 # AI helpers
@@ -308,6 +371,7 @@ async def delete_child(child_id: str, user: dict = Depends(get_current_user)):
     await db.chat_messages.delete_many({"child_id": child_id})
     await db.stories.delete_many({"child_id": child_id})
     await db.activities.delete_many({"child_id": child_id})
+    await db.prayers.delete_many({"child_id": child_id})
     return {"ok": True}
 
 # ---------------------------------------------------------------------------
@@ -504,6 +568,54 @@ async def save_story(child_id: str, payload: dict, user: dict = Depends(get_curr
 async def list_stories(child_id: str, user: dict = Depends(get_current_user)):
     await get_owned_child(child_id, user)
     return await db.stories.find({"child_id": child_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+# ---------------------------------------------------------------------------
+# Scripture library + Prayer Corner
+# ---------------------------------------------------------------------------
+
+@api_router.get("/scriptures")
+async def scriptures():
+    return {"categories": SCRIPTURE_LIBRARY}
+
+@api_router.post("/prayer/generate")
+async def gen_prayer(data: PrayerGenInput, user: dict = Depends(get_current_user)):
+    ctx = ""
+    if data.feeling:
+        ctx += f" The child is feeling {data.feeling}."
+    if data.about:
+        ctx += f" They want to pray about: {data.about}."
+    system = ("You write a short, simple, heartfelt Christian prayer for a child "
+              f"around {data.age} years old to say to God. 2-4 short sentences, warm and hopeful, "
+              "first person ('Dear God...'), easy words, ending with 'Amen.'. "
+              "No extra commentary, just the prayer text.")
+    chat_inst = make_chat(f"prayer-{uuid.uuid4()}", system)
+    try:
+        resp = await chat_inst.send_message(UserMessage(text=f"Write a prayer.{ctx}"))
+        text = (resp or "").strip()
+    except Exception:
+        text = "Dear God, thank You for loving me. Please help me feel safe and brave today. I know You are always with me. Amen."
+    return {"prayer": text}
+
+@api_router.post("/children/{child_id}/prayers")
+async def add_prayer(child_id: str, data: PrayerInput, user: dict = Depends(get_current_user)):
+    child = await get_owned_child(child_id, user)
+    doc = {"id": str(uuid.uuid4()), "child_id": child_id, "text": data.text.strip(),
+           "kind": data.kind, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.prayers.insert_one(doc)
+    updated = await award_stars(child, 2)
+    doc.pop("_id", None)
+    return {"prayer": doc, "child": updated}
+
+@api_router.get("/children/{child_id}/prayers")
+async def list_prayers(child_id: str, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    return await db.prayers.find({"child_id": child_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+@api_router.delete("/children/{child_id}/prayers/{prayer_id}")
+async def delete_prayer(child_id: str, prayer_id: str, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    await db.prayers.delete_one({"id": prayer_id, "child_id": child_id})
+    return {"ok": True}
 
 # ---------------------------------------------------------------------------
 # Text to speech (read aloud)

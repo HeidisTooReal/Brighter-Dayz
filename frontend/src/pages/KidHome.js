@@ -4,12 +4,15 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import KidShell from "@/components/KidShell";
 import ReadAloud from "@/components/ReadAloud";
+import Confetti from "@/components/Confetti";
 import { ASSETS, MOODS, MOOD_REPLIES } from "@/lib/assets";
-import { MessageCircleHeart, Wind, BookOpen, Sparkles, Gamepad2, Award, Loader2 } from "lucide-react";
+import { MessageCircleHeart, Wind, BookOpen, Sparkles, Gamepad2, Award, HandHeart, ScrollText, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const TILES = [
   { key: "chat", to: "chat", label: "Talk to Sunny", icon: MessageCircleHeart, bg: "#E8DFF5", span: "sm:col-span-2" },
+  { key: "prayer", to: "prayer", label: "Prayer Corner", icon: HandHeart, bg: "#EAF0FB", span: "" },
+  { key: "promises", to: "promises", label: "God's Promises", icon: ScrollText, bg: "#FFF1CF", span: "" },
   { key: "breathe", to: "breathe", label: "Breathe & Calm", icon: Wind, bg: "#D8F3DC", span: "" },
   { key: "story", to: "story", label: "Story Time", icon: BookOpen, bg: "#FFE3B3", span: "" },
   { key: "affirmations", to: "affirmations", label: "Happy Words", icon: Sparkles, bg: "#FFD9D4", span: "" },
@@ -24,6 +27,7 @@ export default function KidHome() {
   const [child, setChild] = useState(null);
   const [daily, setDaily] = useState(null);
   const [moodMsg, setMoodMsg] = useState("");
+  const [celebrate, setCelebrate] = useState(false);
 
   const loadChild = async () => {
     const { data } = await api.get(`/children/${childId}`);
@@ -47,6 +51,7 @@ export default function KidHome() {
 
   return (
     <KidShell child={child} hideBack bg="linear-gradient(180deg,#FEF6E4 0%,#FDFBF7 40%)">
+      <Confetti show={celebrate} onDone={() => setCelebrate(false)} />
       {user?.role === "teen" ? (
         <button data-testid="home-signout" onClick={async () => { await logout(); navigate("/"); }} className="mb-3 text-sm font-semibold text-[#457B9D]">↩ Sign out</button>
       ) : (

@@ -13,6 +13,8 @@ import StoryTime from "@/pages/StoryTime";
 import Affirmations from "@/pages/Affirmations";
 import Games from "@/pages/Games";
 import Badges from "@/pages/Badges";
+import PrayerCorner from "@/pages/PrayerCorner";
+import Promises from "@/pages/Promises";
 import Crisis from "@/pages/Crisis";
 import ParentDashboard from "@/pages/ParentDashboard";
 
@@ -61,6 +63,8 @@ function App() {
             <Route path="/kid/:childId/affirmations" element={<Protected><Affirmations /></Protected>} />
             <Route path="/kid/:childId/games" element={<Protected><Games /></Protected>} />
             <Route path="/kid/:childId/badges" element={<Protected><Badges /></Protected>} />
+            <Route path="/kid/:childId/prayer" element={<Protected><PrayerCorner /></Protected>} />
+            <Route path="/kid/:childId/promises" element={<Protected><Promises /></Protected>} />
             <Route path="/help" element={<Crisis />} />
           </Routes>
         </AuthProvider>

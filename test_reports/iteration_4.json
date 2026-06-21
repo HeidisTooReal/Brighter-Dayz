@@ -1,0 +1,43 @@
+{
+  "summary": "End-to-end frontend testing of 3 new faith features + regression. Prayer Corner, God's Promises, and all regressions PASS. ONE CRITICAL BUG: badge-unlock confetti never appears because KidHome.js never calls setCelebrate(true). Backend behavior is correct (first mood awards 2 stars, first_step badge granted), and the Confetti component itself renders correctly when show=true, but the trigger logic in pickMood() is missing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "KidHome.js (pickMood)",
+        "issue": "Badge-unlock confetti NEVER triggers. setCelebrate(true) is not called anywhere in KidHome.js. After a fresh child's first mood check-in (stars 0->2, first_step badge granted by backend), zero confetti emoji spans appear in DOM. The <Confetti show={celebrate}/> overlay is wired up but the celebrate state is always false. Required fix: in pickMood, compare child.badges.length before vs new badges in response (data.child.badges.length); if it increased, setCelebrate(true). Example: const before=(child?.badges||[]).length; const newCount=(data.child?.badges||[]).length; if (newCount>before) setCelebrate(true); setChild(data.child);",
+        "selector": "[data-testid=\"mood-struggling\"] (and any other mood-*)",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_brighterdayz_api.py",
+    "/app/backend/tests/test_auth_roles_pin.py"
+  ],
+  "action_items": [
+    "Fix KidHome.js pickMood to call setCelebrate(true) when badges count increases (e.g., crossing 1/10/25/50/100 star thresholds). Backend already returns updated child with badges array; just diff old vs new length."
+  ],
+  "critical_code_review_comments": [
+    "KidHome.js line 42-48: pickMood() never invokes setCelebrate. The Confetti overlay on line 54 is effectively dead code until this is fixed.",
+    "PrayerCorner.js: PROMPTS contain spaces -> data-testid like 'prayer-prompt-Thank You God for...' which is fine for tests but unconventional; consider slugifying.",
+    "Promises.js: useEffect uses categories[0] as initial active; this is correct so default verses render on load (verified: 4 'scared' verses visible on first load).",
+    "Confetti.js looks correct: pointer-events-none, z-[80], 2.6s auto-dismiss - cannot block clicks."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (curl-verified per E1: /scriptures, /prayer/generate, /children/{id}/prayers save+list+delete, /moods awards stars)",
+    "frontend": "88% (7/8 features verified: 8 tiles render, prayer prompts/save/AI/delete, scriptures 8 cats + default verses + read-aloud, mood logs/stars increment, existing tile nav, PIN gate, teen signup. FAILED: confetti trigger.)"
+  },
+  "test_credentials": "Demo parent parent@brighterdayz.org / Sunshine123, PIN 2468. Teen signup: any new <name>@example.com with age>=13 works.",
+  "seed_data_creation": "Created 'TestKidConf' and 'ConfettiKid' child profiles under demo parent during testing (visible in Parent Dashboard screenshot). Also one TeenT teen account via API. Harmless test data; can be cleaned up via parent dashboard trash icon.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes KidHome.js pickMood to call setCelebrate(true) when badges count increases, retest by: (1) login parent@brighterdayz.org/Sunshine123, (2) create fresh child via add-child-btn, (3) click mood-struggling (or any mood), (4) within 2.6s verify DOM has div.fixed.pointer-events-none.z-[80] containing >0 <span> emoji children. Backend already validated. All other features pass.",
+  "rca of the issue": "RCA: In /app/frontend/src/pages/KidHome.js, state setter setCelebrate is declared (line 30) and consumed by <Confetti show={celebrate}/> (line 54), but never invoked. pickMood() (lines 42-48) calls api.post /moods and only does setChild(data.child) without diffing badges. Backend response shape: {mood:{...}, child:{...badges:[...]}}. Reproduction: fresh child + any mood => stars 0->2, badges goes from [] to ['first_step'], no visual confetti. Mitigation: diff badges length pre/post and setCelebrate(true) if it grew."
+}
