@@ -133,7 +133,7 @@ class StoryInput(BaseModel):
 
 class TTSInput(BaseModel):
     text: str
-    voice: str = "coral"
+    voice: str = "onyx"
 
 class ActivityInput(BaseModel):
     type: str          # breathing | game | story | affirmation | chat

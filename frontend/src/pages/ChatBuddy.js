@@ -77,7 +77,7 @@ export default function ChatBuddy() {
                 className={`max-w-[80%] rounded-3xl px-4 py-3 text-lg ${m.role === "user" ? "bg-[#457B9D] text-white rounded-br-md" : "bg-white text-[#1D3557] shadow-sm rounded-bl-md"}`}>
                 {m.text || (sending ? <Loader2 className="h-5 w-5 animate-spin" /> : "")}
                 {m.role === "assistant" && m.text && !sending && (
-                  <div className="mt-2"><ReadAloud text={m.text} voice="coral" testid={`chat-read-${i}`} label="Hear it" /></div>
+                  <div className="mt-2"><ReadAloud text={m.text} voice="onyx" testid={`chat-read-${i}`} label="Hear it" /></div>
                 )}
               </div>
             </div>

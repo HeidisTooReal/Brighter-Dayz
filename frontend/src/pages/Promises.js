@@ -44,7 +44,7 @@ export default function Promises() {
                 <div key={i} data-testid={`promise-verse-${active.id}-${i}`} className="rounded-3xl p-5 shadow-sm" style={{ background: active.color + "66" }}>
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-xl leading-relaxed text-[#1D3557]">"{v.text}"</p>
-                    <ReadAloud text={`${v.text} ${v.ref}`} voice="fable" label="Hear it" testid={`promise-read-${active.id}-${i}`} />
+                    <ReadAloud text={`${v.text} ${v.ref}`} voice="onyx" label="Hear it" testid={`promise-read-${active.id}-${i}`} />
                   </div>
                   <p className="mt-2 text-sm font-bold text-[#457B9D]">— {v.ref}</p>
                 </div>
