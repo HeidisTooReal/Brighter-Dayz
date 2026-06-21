@@ -5,7 +5,7 @@ import { ASSETS } from "@/lib/assets";
 
 const OPERATOR = "HLM LLC";
 const APP_NAME = "Brighter Dayz";
-const CONTACT_EMAIL = "privacy@brighterdayz.org"; // update once your domain email is live
+const CONTACT_EMAIL = "privacy@brighterdayz.faith"; // create this mailbox in Google Workspace
 const EFFECTIVE = "June 21, 2026";
 
 function Section({ title, children }) {
