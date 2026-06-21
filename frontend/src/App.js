@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import api from "@/lib/api";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AuthPage from "@/pages/AuthPage";
 import Profiles from "@/pages/Profiles";

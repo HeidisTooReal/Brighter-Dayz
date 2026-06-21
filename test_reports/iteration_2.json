@@ -1,0 +1,51 @@
+{
+  "summary": "Tested new role/PIN auth feature on Brighter Dayz. Backend (11/11 new pytest cases) is solid: teen register blocks <13 with gentle message, age 14 creates account + auto child + Bearer token, has_pin in /auth/me, set-pin validates 4-6 digit numerics, verify-pin returns 200/401, Bearer JWT works without cookies. Frontend mostly works: demo parent login + Bearer persistence + Profiles screen, PIN gate (wrong 0000 -> pin-error, correct 2468 -> /parent), under-13 age gate inline error, fresh parent (no PIN) sees pin-tip and goes directly to /parent, regression child create + mood +2 stars + parent KidHome shows home-switch-profile. CRITICAL BUG: Teen self sign-up does NOT redirect to /kid/:id — they land on the parent Profiles screen instead (App.js Root renders <Profiles/> for every signed-in user; the required teen->TeenHome routing branch is missing).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "App.js Root",
+        "issue": "Teen role is NOT routed to /kid/:id after register; teens (and on refresh) see the parent Profiles screen with 'Set PIN', 'Parent Dashboard', 'Tip: Set a Parent PIN…' and an 'Add a child' tile. Their auto-created child appears as a card. The required home-signout control is absent on Profiles.",
+        "selector": "Root() in /app/frontend/src/App.js line 30-34",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Parent PIN gate on first click after login",
+        "issue": "hasPin is loaded asynchronously in Profiles.js via api.get('/auth/me') after mount and defaults to false. A user who clicks goto-parent-dashboard before that promise resolves bypasses the PIN modal and navigates straight to /parent. Race only ~1-2s but reproducible on fast clicks. Move has_pin into AuthContext (login/register already return it) so initial render has correct value.",
+        "affected_selectors": ["goto-parent-dashboard", "pin-input"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_roles_pin.py",
+    "/app/backend/tests/test_brighterdayz_api.py",
+    "/app/test_reports/pytest/pytest_auth_roles_pin.xml"
+  ],
+  "action_items": [
+    "FIX (critical): Update Root() in /app/frontend/src/App.js so that when user.role === 'teen' and user.child_id (or first owned child id) is known, it <Navigate to={`/kid/${child_id}`} replace />. Currently it unconditionally renders <Profiles/>, making teens see the parent UI. The review request explicitly calls this out: 'src/App.js (Root: teen -> TeenHome redirect to their kid home; parent -> Profiles)'.",
+    "FIX (high): Lift has_pin into AuthContext (login/register/me all return it) to remove the Profiles race condition that lets users click 'Parent Dashboard' before hasPin loads and skip the PIN gate.",
+    "Optional: ensure /auth/me endpoint returns child_id (or have AuthContext fetch /children for teens) so a refreshed teen session can still resolve their kid home id."
+  ],
+  "critical_code_review_comments": [
+    "App.js Root is hardcoded to <Profiles/> for signed-in users; no role branching — this is the root cause of the teen-flow regression.",
+    "Profiles.js useEffect calls api.get('/auth/me') AGAIN purely to discover has_pin even though login() already returns has_pin in its response; this duplicates work and creates the race that lets users skip the PIN gate.",
+    "Login response from backend includes has_pin but AuthContext discards it — user object stored has the field, yet Profiles refetches anyway. Consolidate to AuthContext user state.",
+    "server.py CORS still uses '*' fallback while allow_credentials=True — works for Bearer (no cookies) but should be tightened to explicit origins for prod."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_roles_pin.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 new + 22/22 regression)",
+    "frontend": "75% (6/8 — demo login+persist PASS, PIN gate PASS w/ wait, age gate PASS, fresh-parent no-PIN PASS, child create+mood PASS, parent KidHome control PASS; teen redirect FAIL, PIN race FAIL)"
+  },
+  "test_credentials": "Demo parent parent@brighterdayz.org / Sunshine123, PIN 2468 (verified set in DB by test_ensure_demo_pin_is_2468; matches /app/memory/test_credentials.md).",
+  "seed_data_creation": "Created throwaway @example.com accounts via API for teen/parent register tests and one parent dashboard child 'TestKid<hex>'. The frontend run also created a 'TeenTess' teen account. All users left harmlessly in users collection; child profiles left in children collection.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After main agent fixes App.js Root teen redirect, retest TEST4 (teen register -> /kid/:id with home-signout) and TEST6c (race when setting PIN). Backend regression file is /app/backend/tests/test_brighterdayz_api.py; new auth/PIN coverage is /app/backend/tests/test_auth_roles_pin.py (runs in ~4s). The demo parent now has PIN 2468 persisted in MongoDB.",
+  "rca of the issue": "Teen self sign-up bug RCA: Root() in /app/frontend/src/App.js line 30-34 reads `return user ? <Profiles /> : <AuthPage />;`. It does not inspect user.role. The backend POST /auth/register correctly returns {role: 'teen', child_id: '<uuid>', token} and AuthContext stores that in user state, but Root ignores the role and renders Profiles for every authenticated user. Reproduction: open /, switch to Create Account, click who-teen, fill name+age 14+email+password, submit -> URL stays at /, Profiles screen shown with the auto-created child appearing as a card (no home-signout). Mitigation: add `if (user.role === 'teen') { return <Navigate to={`/kid/${user.child_id}`} replace />; }` before `return <Profiles/>` in Root. Persist child_id in user state (already in register response) and have /auth/me return it (or refetch /children on mount for teens)."
+}

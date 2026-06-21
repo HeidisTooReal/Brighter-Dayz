@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import KidShell from "@/components/KidShell";
 import ReadAloud from "@/components/ReadAloud";
 import { ASSETS, MOODS, MOOD_REPLIES } from "@/lib/assets";
@@ -19,6 +20,7 @@ const TILES = [
 export default function KidHome() {
   const { childId } = useParams();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [child, setChild] = useState(null);
   const [daily, setDaily] = useState(null);
   const [moodMsg, setMoodMsg] = useState("");
@@ -44,7 +46,11 @@ export default function KidHome() {
 
   return (
     <KidShell child={child} hideBack bg="linear-gradient(180deg,#FEF6E4 0%,#FDFBF7 40%)">
-      <button data-testid="home-switch-profile" onClick={() => navigate("/")} className="mb-3 text-sm font-semibold text-[#457B9D]">← Switch profile</button>
+      {user?.role === "teen" ? (
+        <button data-testid="home-signout" onClick={async () => { await logout(); navigate("/"); }} className="mb-3 text-sm font-semibold text-[#457B9D]">↩ Sign out</button>
+      ) : (
+        <button data-testid="home-switch-profile" onClick={() => navigate("/")} className="mb-3 text-sm font-semibold text-[#457B9D]">← Switch profile</button>
+      )}
 
       <div className="flex items-center gap-4 mb-6">
         <motion.img src={ASSETS.sunny} alt="Sunny" className="h-24 w-24 object-contain"

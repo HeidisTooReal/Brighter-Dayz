@@ -32,6 +32,7 @@ db = client[os.environ['DB_NAME']]
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 JWT_ALGORITHM = "HS256"
+MIN_SELF_SIGNUP_AGE = 13   # Google Play / COPPA minimum age for self sign-up without a parent
 
 app = FastAPI(title="Brighter Dayz API")
 api_router = APIRouter(prefix="/api")
@@ -90,6 +91,11 @@ class RegisterInput(BaseModel):
     name: str
     email: EmailStr
     password: str
+    role: str = "parent"          # parent | teen
+    age: Optional[int] = None     # required for teen self-signup
+
+class PinInput(BaseModel):
+    pin: str
 
 class LoginInput(BaseModel):
     email: EmailStr
@@ -199,14 +205,33 @@ async def register(data: RegisterInput, response: Response):
     email = data.email.lower().strip()
     if await db.users.find_one({"email": email}):
         raise HTTPException(status_code=400, detail="An account with this email already exists.")
+
+    role = data.role if data.role in ("parent", "teen") else "parent"
+    child_id = None
+
+    if role == "teen":
+        if not data.age or data.age < MIN_SELF_SIGNUP_AGE:
+            raise HTTPException(status_code=400,
+                detail=f"You need a parent or guardian to set up your account. Kids under {MIN_SELF_SIGNUP_AGE} can ask a grown-up to create one for them.")
+
     doc = {"email": email, "password_hash": hash_password(data.password),
-           "name": data.name.strip(), "role": "parent",
+           "name": data.name.strip(), "role": role, "age": data.age,
            "created_at": datetime.now(timezone.utc).isoformat()}
     res = await db.users.insert_one(doc)
     uid = str(res.inserted_id)
+
+    if role == "teen":
+        child = {"id": str(uuid.uuid4()), "parent_id": uid, "name": data.name.strip(),
+                 "age": data.age, "avatar": "🦊", "stars": 0, "streak": 0,
+                 "last_active": None, "badges": [], "self": True,
+                 "created_at": datetime.now(timezone.utc).isoformat()}
+        await db.children.insert_one(child)
+        child_id = child["id"]
+
     token = create_access_token(uid, email)
     set_auth_cookie(response, token)
-    return {"id": uid, "name": doc["name"], "email": email, "role": "parent", "token": token}
+    return {"id": uid, "name": doc["name"], "email": email, "role": role,
+            "child_id": child_id, "has_pin": False, "token": token}
 
 @api_router.post("/auth/login")
 async def login(data: LoginInput, response: Response):
@@ -217,7 +242,8 @@ async def login(data: LoginInput, response: Response):
     uid = str(user["_id"])
     token = create_access_token(uid, email)
     set_auth_cookie(response, token)
-    return {"id": uid, "name": user.get("name"), "email": email, "role": user.get("role", "parent"), "token": token}
+    return {"id": uid, "name": user.get("name"), "email": email, "role": user.get("role", "parent"),
+            "has_pin": bool(user.get("pin_hash")), "token": token}
 
 @api_router.post("/auth/logout")
 async def logout(response: Response):
@@ -227,7 +253,22 @@ async def logout(response: Response):
 @api_router.get("/auth/me")
 async def me(user: dict = Depends(get_current_user)):
     return {"id": user["_id"], "name": user.get("name"), "email": user.get("email"),
-            "role": user.get("role", "parent")}
+            "role": user.get("role", "parent"), "has_pin": bool(user.get("pin_hash"))}
+
+@api_router.post("/auth/set-pin")
+async def set_pin(data: PinInput, user: dict = Depends(get_current_user)):
+    pin = (data.pin or "").strip()
+    if not (pin.isdigit() and 4 <= len(pin) <= 6):
+        raise HTTPException(status_code=400, detail="PIN must be 4 to 6 numbers.")
+    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"pin_hash": hash_password(pin)}})
+    return {"ok": True}
+
+@api_router.post("/auth/verify-pin")
+async def verify_pin(data: PinInput, user: dict = Depends(get_current_user)):
+    full = await db.users.find_one({"_id": ObjectId(user["_id"])})
+    if not full or not full.get("pin_hash") or not verify_password((data.pin or "").strip(), full["pin_hash"]):
+        raise HTTPException(status_code=401, detail="That PIN isn't right. Try again.")
+    return {"ok": True}
 
 # ---------------------------------------------------------------------------
 # Child profile routes
