@@ -61,6 +61,32 @@ let webpackConfig = {
 };
 
 webpackConfig.devServer = (devServerConfig) => {
+  // Compat shim: webpack-dev-server v5 removed onBeforeSetupMiddleware /
+  // onAfterSetupMiddleware (still emitted by react-scripts 5). Translate them
+  // into the supported setupMiddlewares API to avoid schema validation errors.
+  const before = devServerConfig.onBeforeSetupMiddleware;
+  const after = devServerConfig.onAfterSetupMiddleware;
+  if (before || after) {
+    delete devServerConfig.onBeforeSetupMiddleware;
+    delete devServerConfig.onAfterSetupMiddleware;
+    const prev = devServerConfig.setupMiddlewares;
+    devServerConfig.setupMiddlewares = (middlewares, devServer) => {
+      if (before) before(devServer);
+      const result = prev ? prev(middlewares, devServer) : middlewares;
+      if (after) after(devServer);
+      return result;
+    };
+  }
+
+  // Compat shim: v5 replaced `https` with `server`.
+  if ("https" in devServerConfig) {
+    const https = devServerConfig.https;
+    delete devServerConfig.https;
+    if (https && typeof https === "object") {
+      devServerConfig.server = { type: "https", options: https };
+    }
+  }
+
   // Add health check endpoints if enabled
   if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
     const originalSetupMiddlewares = devServerConfig.setupMiddlewares;

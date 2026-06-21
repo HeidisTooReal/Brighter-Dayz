@@ -1,53 +1,53 @@
-import { useEffect } from "react";
+import React from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import AuthPage from "@/pages/AuthPage";
+import Profiles from "@/pages/Profiles";
+import KidHome from "@/pages/KidHome";
+import ChatBuddy from "@/pages/ChatBuddy";
+import Breathe from "@/pages/Breathe";
+import StoryTime from "@/pages/StoryTime";
+import Affirmations from "@/pages/Affirmations";
+import Games from "@/pages/Games";
+import Crisis from "@/pages/Crisis";
+import ParentDashboard from "@/pages/ParentDashboard";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+function Loading() {
+  return <div className="min-h-screen flex items-center justify-center bg-[#FDFBF7]"><Loader2 className="h-10 w-10 animate-spin text-[#457B9D]" /></div>;
+}
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+function Protected({ children }) {
+  const { user } = useAuth();
+  if (user === null) return <Loading />;
+  if (!user) return <Navigate to="/" replace />;
+  return children;
+}
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+function Root() {
+  const { user } = useAuth();
+  if (user === null) return <Loading />;
+  return user ? <Profiles /> : <AuthPage />;
+}
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Root />} />
+            <Route path="/parent" element={<Protected><ParentDashboard /></Protected>} />
+            <Route path="/kid/:childId" element={<Protected><KidHome /></Protected>} />
+            <Route path="/kid/:childId/chat" element={<Protected><ChatBuddy /></Protected>} />
+            <Route path="/kid/:childId/breathe" element={<Protected><Breathe /></Protected>} />
+            <Route path="/kid/:childId/story" element={<Protected><StoryTime /></Protected>} />
+            <Route path="/kid/:childId/affirmations" element={<Protected><Affirmations /></Protected>} />
+            <Route path="/kid/:childId/games" element={<Protected><Games /></Protected>} />
+            <Route path="/help" element={<Crisis />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </div>
   );

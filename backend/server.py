@@ -1,74 +1,507 @@
-from fastapi import FastAPI, APIRouter
 from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
-import uuid
-from datetime import datetime, timezone
-
-
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
+import os
+import logging
+import uuid
+import secrets
+from datetime import datetime, timezone, timedelta, date
+
+import jwt
+import bcrypt
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends
+from fastapi.responses import StreamingResponse
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional
+from bson import ObjectId
+
+from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
+from emergentintegrations.llm.openai import OpenAITextToSpeech
+
+# ---------------------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------------------
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
+JWT_ALGORITHM = "HS256"
 
-# Create a router with the /api prefix
+app = FastAPI(title="Brighter Dayz API")
 api_router = APIRouter(prefix="/api")
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("brighterdayz")
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+# ---------------------------------------------------------------------------
+# Auth helpers
+# ---------------------------------------------------------------------------
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-# Add your routes to the router instead of directly to app
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
+
+def create_access_token(user_id: str, email: str) -> str:
+    payload = {"sub": user_id, "email": email,
+               "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "access"}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def set_auth_cookie(response: Response, token: str):
+    response.set_cookie(key="access_token", value=token, httponly=True,
+                        secure=False, samesite="lax", max_age=604800, path="/")
+
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("access_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
+        raise HTTPException(status_code=401, detail="Not signed in")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        user["_id"] = str(user["_id"])
+        user.pop("password_hash", None)
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid session")
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
+
+class RegisterInput(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+class LoginInput(BaseModel):
+    email: EmailStr
+    password: str
+
+class ChildInput(BaseModel):
+    name: str
+    age: int
+    avatar: str = "lamb"
+
+class MoodInput(BaseModel):
+    mood: str          # struggling | anxious | okay | better | grateful
+    note: Optional[str] = ""
+
+class ChatInput(BaseModel):
+    message: str
+
+class AffirmationInput(BaseModel):
+    age: int = 8
+    feeling: Optional[str] = None
+
+class StoryInput(BaseModel):
+    kind: str = "biblical"      # biblical | reallife
+    topic: Optional[str] = None
+    age: int = 8
+
+class TTSInput(BaseModel):
+    text: str
+    voice: str = "coral"
+
+class ActivityInput(BaseModel):
+    type: str          # breathing | game | story | affirmation | chat
+    detail: Optional[str] = ""
+
+# ---------------------------------------------------------------------------
+# Daily faith content (kid friendly, rotates by day of year)
+# ---------------------------------------------------------------------------
+DAILY_VERSES = [
+    {"text": "I can do all things through Christ who gives me strength.", "ref": "Philippians 4:13"},
+    {"text": "Be strong and brave. Do not be afraid, for the Lord your God is with you wherever you go.", "ref": "Joshua 1:9"},
+    {"text": "God is my helper. I will not be afraid.", "ref": "Psalm 118:6"},
+    {"text": "Cast all your worries on Him, because He cares about you.", "ref": "1 Peter 5:7"},
+    {"text": "The Lord is my shepherd; I have everything I need.", "ref": "Psalm 23:1"},
+    {"text": "God made you wonderfully. You are special!", "ref": "Psalm 139:14"},
+    {"text": "Let the little children come to me, said Jesus.", "ref": "Matthew 19:14"},
+    {"text": "Be kind to one another, tender-hearted and forgiving.", "ref": "Ephesians 4:32"},
+    {"text": "God is close to you when you feel sad.", "ref": "Psalm 34:18"},
+    {"text": "Give thanks to the Lord, for He is good!", "ref": "Psalm 107:1"},
+    {"text": "When I am afraid, I put my trust in God.", "ref": "Psalm 56:3"},
+    {"text": "Do everything in love.", "ref": "1 Corinthians 16:14"},
+    {"text": "God's love for you never, ever ends.", "ref": "Psalm 136:1"},
+    {"text": "You are the light of the world. Let your light shine!", "ref": "Matthew 5:14"},
+    {"text": "Come to me when you are tired, and I will give you rest.", "ref": "Matthew 11:28"},
+]
+DAILY_AFFIRMATIONS = [
+    "I am loved by God, exactly as I am.",
+    "I am brave, even when things feel hard.",
+    "God made me special and good.",
+    "I can be kind to myself and to others today.",
+    "It's okay to feel my feelings. God is with me.",
+    "I am never alone — God is always near.",
+    "Today is a brand new chance to shine.",
+    "I am calm. I can take a deep breath.",
+    "My family and God love me very much.",
+    "I am strong, and I can ask for help when I need it.",
+    "God has good plans for me.",
+    "I matter, and my feelings matter.",
+    "I can do hard things with God's help.",
+    "I choose to be thankful for today.",
+    "I am safe, I am loved, I am enough.",
+]
+
+def todays_index(n: int) -> int:
+    return date.today().timetuple().tm_yday % n
+
+# ---------------------------------------------------------------------------
+# AI helpers
+# ---------------------------------------------------------------------------
+
+def buddy_system_prompt(child_name: str, age: int) -> str:
+    return (
+        f"You are Sunny, a gentle, cheerful cartoon lamb who is a caring friend to {child_name}, "
+        f"a {age}-year-old child, in a Christian faith-based kids app called Brighter Dayz. "
+        "You speak warmly, simply, and with lots of encouragement, the way a kind Sunday-school teacher "
+        "would talk to a young child. Use short sentences and easy words appropriate for the child's age. "
+        "Gently weave in God's love, hope, and simple Bible truths when it fits naturally, without being preachy. "
+        "Help the child name and understand their feelings, and suggest small healthy coping ideas like "
+        "deep breaths, talking to a trusted grown-up, drawing, or saying a short prayer. "
+        "You are NOT a therapist or doctor and never give medical or diagnosis advice. "
+        "SAFETY: If the child mentions wanting to hurt themselves or others, being hurt or abused, or being in danger, "
+        "respond with calm warmth, tell them it is brave to share, and gently and clearly encourage them to tell a "
+        "trusted grown-up right away (a parent, teacher, or counselor) and that they can tap the 'Get Help' button. "
+        "Never use scary language. Keep replies brief (2-5 short sentences). Avoid emojis overload; one or two at most. "
+        "Always be safe, positive, age-appropriate, and loving."
+    )
+
+def make_chat(session_id: str, system_prompt: str) -> LlmChat:
+    return LlmChat(api_key=EMERGENT_LLM_KEY, session_id=session_id,
+                   system_message=system_prompt).with_model("anthropic", "claude-sonnet-4-6")
+
+# ---------------------------------------------------------------------------
+# Auth routes
+# ---------------------------------------------------------------------------
+
+@api_router.post("/auth/register")
+async def register(data: RegisterInput, response: Response):
+    email = data.email.lower().strip()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="An account with this email already exists.")
+    doc = {"email": email, "password_hash": hash_password(data.password),
+           "name": data.name.strip(), "role": "parent",
+           "created_at": datetime.now(timezone.utc).isoformat()}
+    res = await db.users.insert_one(doc)
+    uid = str(res.inserted_id)
+    set_auth_cookie(response, create_access_token(uid, email))
+    return {"id": uid, "name": doc["name"], "email": email, "role": "parent"}
+
+@api_router.post("/auth/login")
+async def login(data: LoginInput, response: Response):
+    email = data.email.lower().strip()
+    user = await db.users.find_one({"email": email})
+    if not user or not verify_password(data.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Wrong email or password.")
+    uid = str(user["_id"])
+    set_auth_cookie(response, create_access_token(uid, email))
+    return {"id": uid, "name": user.get("name"), "email": email, "role": user.get("role", "parent")}
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    return {"ok": True}
+
+@api_router.get("/auth/me")
+async def me(user: dict = Depends(get_current_user)):
+    return {"id": user["_id"], "name": user.get("name"), "email": user.get("email"),
+            "role": user.get("role", "parent")}
+
+# ---------------------------------------------------------------------------
+# Child profile routes
+# ---------------------------------------------------------------------------
+
+async def get_owned_child(child_id: str, user: dict) -> dict:
+    child = await db.children.find_one({"id": child_id, "parent_id": user["_id"]})
+    if not child:
+        raise HTTPException(status_code=404, detail="Child profile not found")
+    child.pop("_id", None)
+    return child
+
+@api_router.post("/children")
+async def create_child(data: ChildInput, user: dict = Depends(get_current_user)):
+    doc = {"id": str(uuid.uuid4()), "parent_id": user["_id"], "name": data.name.strip(),
+           "age": data.age, "avatar": data.avatar, "stars": 0, "streak": 0,
+           "last_active": None, "badges": [],
+           "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.children.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/children")
+async def list_children(user: dict = Depends(get_current_user)):
+    children = await db.children.find({"parent_id": user["_id"]}, {"_id": 0}).to_list(50)
+    return children
+
+@api_router.get("/children/{child_id}")
+async def get_child(child_id: str, user: dict = Depends(get_current_user)):
+    return await get_owned_child(child_id, user)
+
+@api_router.delete("/children/{child_id}")
+async def delete_child(child_id: str, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    await db.children.delete_one({"id": child_id})
+    await db.moods.delete_many({"child_id": child_id})
+    await db.chat_messages.delete_many({"child_id": child_id})
+    await db.stories.delete_many({"child_id": child_id})
+    await db.activities.delete_many({"child_id": child_id})
+    return {"ok": True}
+
+# ---------------------------------------------------------------------------
+# Rewards helper
+# ---------------------------------------------------------------------------
+BADGES = [
+    {"id": "first_step", "label": "First Step", "stars": 1},
+    {"id": "rising_sun", "label": "Rising Sun", "stars": 10},
+    {"id": "brave_heart", "label": "Brave Heart", "stars": 25},
+    {"id": "shining_star", "label": "Shining Star", "stars": 50},
+    {"id": "sunshine_hero", "label": "Sunshine Hero", "stars": 100},
+]
+
+async def award_stars(child: dict, amount: int) -> dict:
+    today_str = date.today().isoformat()
+    last = child.get("last_active")
+    streak = child.get("streak", 0)
+    if last != today_str:
+        if last == (date.today() - timedelta(days=1)).isoformat():
+            streak += 1
+        else:
+            streak = 1
+    new_stars = child.get("stars", 0) + amount
+    badges = set(child.get("badges", []))
+    for b in BADGES:
+        if new_stars >= b["stars"]:
+            badges.add(b["id"])
+    await db.children.update_one({"id": child["id"]},
+        {"$set": {"stars": new_stars, "streak": streak, "last_active": today_str,
+                  "badges": list(badges)}})
+    updated = await db.children.find_one({"id": child["id"]}, {"_id": 0})
+    return updated
+
+# ---------------------------------------------------------------------------
+# Mood routes
+# ---------------------------------------------------------------------------
+
+@api_router.post("/children/{child_id}/moods")
+async def log_mood(child_id: str, data: MoodInput, user: dict = Depends(get_current_user)):
+    child = await get_owned_child(child_id, user)
+    doc = {"id": str(uuid.uuid4()), "child_id": child_id, "mood": data.mood,
+           "note": data.note or "", "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.moods.insert_one(doc)
+    updated = await award_stars(child, 2)
+    doc.pop("_id", None)
+    return {"mood": doc, "child": updated}
+
+@api_router.get("/children/{child_id}/moods")
+async def get_moods(child_id: str, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    moods = await db.moods.find({"child_id": child_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return moods
+
+# ---------------------------------------------------------------------------
+# Activity log (for parent dashboard) + rewards
+# ---------------------------------------------------------------------------
+
+@api_router.post("/children/{child_id}/activities")
+async def log_activity(child_id: str, data: ActivityInput, user: dict = Depends(get_current_user)):
+    child = await get_owned_child(child_id, user)
+    doc = {"id": str(uuid.uuid4()), "child_id": child_id, "type": data.type,
+           "detail": data.detail or "", "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.activities.insert_one(doc)
+    updated = await award_stars(child, 3)
+    return {"ok": True, "child": updated}
+
+@api_router.get("/children/{child_id}/activities")
+async def get_activities(child_id: str, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    acts = await db.activities.find({"child_id": child_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return acts
+
+@api_router.get("/children/{child_id}/rewards")
+async def get_rewards(child_id: str, user: dict = Depends(get_current_user)):
+    child = await get_owned_child(child_id, user)
+    return {"stars": child.get("stars", 0), "streak": child.get("streak", 0),
+            "badges": child.get("badges", []), "all_badges": BADGES}
+
+# ---------------------------------------------------------------------------
+# Daily content
+# ---------------------------------------------------------------------------
+
+@api_router.get("/daily")
+async def daily():
+    return {"verse": DAILY_VERSES[todays_index(len(DAILY_VERSES))],
+            "affirmation": DAILY_AFFIRMATIONS[todays_index(len(DAILY_AFFIRMATIONS))],
+            "date": date.today().isoformat()}
+
+# ---------------------------------------------------------------------------
+# AI Buddy chat (streaming SSE)
+# ---------------------------------------------------------------------------
+
+@api_router.get("/children/{child_id}/chat/history")
+async def chat_history(child_id: str, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    msgs = await db.chat_messages.find({"child_id": child_id}, {"_id": 0}).sort("created_at", 1).to_list(200)
+    return msgs
+
+@api_router.post("/children/{child_id}/chat")
+async def chat(child_id: str, data: ChatInput, user: dict = Depends(get_current_user)):
+    child = await get_owned_child(child_id, user)
+    now = datetime.now(timezone.utc).isoformat()
+    await db.chat_messages.insert_one({"child_id": child_id, "role": "user",
+                                       "text": data.message, "created_at": now})
+
+    history = await db.chat_messages.find({"child_id": child_id}, {"_id": 0}).sort("created_at", 1).to_list(200)
+    recent = history[-12:-1] if len(history) > 1 else []
+    transcript = "\n".join([f"{'Child' if m['role']=='user' else 'Sunny'}: {m['text']}" for m in recent])
+
+    system = buddy_system_prompt(child["name"], child.get("age", 8))
+    if transcript:
+        system += "\n\nConversation so far:\n" + transcript
+
+    chat_inst = make_chat(f"buddy-{child_id}", system)
+
+    async def gen():
+        full = ""
+        try:
+            async for ev in chat_inst.stream_message(UserMessage(text=data.message)):
+                if isinstance(ev, TextDelta):
+                    full += ev.content
+                    yield ev.content
+                elif isinstance(ev, StreamDone):
+                    break
+        except Exception as e:
+            logger.exception("chat stream failed")
+            if not full:
+                full = "I'm here for you, friend. Let's take a deep breath together. 🌬️"
+                yield full
+        await db.chat_messages.insert_one({"child_id": child_id, "role": "assistant",
+                                           "text": full, "created_at": datetime.now(timezone.utc).isoformat()})
+
+    return StreamingResponse(gen(), media_type="text/plain",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+# ---------------------------------------------------------------------------
+# AI Affirmation
+# ---------------------------------------------------------------------------
+
+@api_router.post("/affirmation/generate")
+async def gen_affirmation(data: AffirmationInput, user: dict = Depends(get_current_user)):
+    feeling = f" The child is feeling {data.feeling}." if data.feeling else ""
+    system = ("You write a single short, uplifting, Christian faith-based affirmation for a child "
+              f"around {data.age} years old. One sentence, warm, simple words, present tense, first person ('I am...'). "
+              "Gently reflect God's love. No quotes, no emojis, no extra text. Just the affirmation sentence.")
+    chat_inst = make_chat(f"affirm-{uuid.uuid4()}", system)
+    try:
+        resp = await chat_inst.send_message(UserMessage(text=f"Write one affirmation.{feeling}"))
+        text = (resp or "").strip().strip('"')
+    except Exception:
+        text = DAILY_AFFIRMATIONS[todays_index(len(DAILY_AFFIRMATIONS))]
+    return {"affirmation": text}
+
+# ---------------------------------------------------------------------------
+# AI Story
+# ---------------------------------------------------------------------------
+
+@api_router.post("/story/generate")
+async def gen_story(data: StoryInput, user: dict = Depends(get_current_user)):
+    if data.kind == "biblical":
+        flavor = ("Tell a short, gentle Bible-based story for a young child that teaches about God's love, "
+                  "courage, or kindness (you may retell a simple Bible story or a story inspired by Jesus the Good Shepherd).")
+    else:
+        flavor = ("Tell a short, gentle real-life story for a young child about an everyday situation they might face "
+                  "(like feeling nervous at school, missing a friend, being scared at night, or sharing), and how they "
+                  "found comfort, courage, and hope, with a gentle reminder that God is with them.")
+    topic = f" The story should relate to: {data.topic}." if data.topic else ""
+    system = (f"You are a warm children's storyteller for a Christian kids app. {flavor} "
+              f"Write for a child around {data.age} years old. Keep it 150-220 words, simple words, short paragraphs, "
+              "a comforting, hopeful ending, and a one-line gentle lesson at the end starting with 'Remember:'. "
+              "Start with a short fun title on the first line.")
+    chat_inst = make_chat(f"story-{uuid.uuid4()}", system)
+    try:
+        resp = await chat_inst.send_message(UserMessage(text=f"Write the story now.{topic}"))
+        text = (resp or "").strip()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Story time is resting. Please try again in a moment.")
+    lines = [l for l in text.split("\n") if l.strip()]
+    title = lines[0].strip("# ").strip() if lines else "A Brighter Day"
+    body = "\n".join(lines[1:]).strip() if len(lines) > 1 else text
+    return {"title": title, "body": body, "kind": data.kind}
+
+@api_router.post("/children/{child_id}/stories/save")
+async def save_story(child_id: str, payload: dict, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    doc = {"id": str(uuid.uuid4()), "child_id": child_id, "title": payload.get("title"),
+           "body": payload.get("body"), "kind": payload.get("kind"),
+           "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.stories.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.get("/children/{child_id}/stories")
+async def list_stories(child_id: str, user: dict = Depends(get_current_user)):
+    await get_owned_child(child_id, user)
+    return await db.stories.find({"child_id": child_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+# ---------------------------------------------------------------------------
+# Text to speech (read aloud)
+# ---------------------------------------------------------------------------
+
+@api_router.post("/tts")
+async def tts(data: TTSInput, user: dict = Depends(get_current_user)):
+    text = (data.text or "")[:4000]
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Nothing to read")
+    try:
+        engine = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
+        audio_b64 = await engine.generate_speech_base64(text=text, model="tts-1", voice=data.voice)
+        return {"audio": f"data:audio/mp3;base64,{audio_b64}"}
+    except Exception as e:
+        logger.exception("tts failed")
+        raise HTTPException(status_code=503, detail="Read aloud is unavailable right now.")
+
+# ---------------------------------------------------------------------------
+# Parent dashboard summary
+# ---------------------------------------------------------------------------
+
+@api_router.get("/parent/overview")
+async def parent_overview(user: dict = Depends(get_current_user)):
+    children = await db.children.find({"parent_id": user["_id"]}, {"_id": 0}).to_list(50)
+    result = []
+    for c in children:
+        moods = await db.moods.find({"child_id": c["id"]}, {"_id": 0}).sort("created_at", -1).to_list(30)
+        acts = await db.activities.count_documents({"child_id": c["id"]})
+        result.append({"child": c, "recent_moods": moods[:7], "mood_count": len(moods),
+                       "activity_count": acts, "last_mood": moods[0] if moods else None})
+    return {"children": result}
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Brighter Dayz API"}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
-
-# Include the router in the main app
+# ---------------------------------------------------------------------------
+# App wiring
+# ---------------------------------------------------------------------------
 app.include_router(api_router)
-
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -77,12 +510,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("email", unique=True)
+    await db.children.create_index("parent_id")
+    await db.moods.create_index("child_id")
+    admin_email = os.environ.get("ADMIN_EMAIL", "parent@brighterdayz.org")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Sunshine123")
+    existing = await db.users.find_one({"email": admin_email})
+    if existing is None:
+        await db.users.insert_one({"email": admin_email, "password_hash": hash_password(admin_password),
+                                   "name": "Demo Parent", "role": "parent",
+                                   "created_at": datetime.now(timezone.utc).isoformat()})
+        logger.info("Seeded demo parent account")
+    elif not verify_password(admin_password, existing["password_hash"]):
+        await db.users.update_one({"email": admin_email},
+                                  {"$set": {"password_hash": hash_password(admin_password)}})
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
