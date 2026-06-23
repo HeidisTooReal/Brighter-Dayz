@@ -6,15 +6,16 @@ import KidShell from "@/components/KidShell";
 import ReadAloud from "@/components/ReadAloud";
 import Confetti from "@/components/Confetti";
 import { ASSETS, MOODS, MOOD_REPLIES } from "@/lib/assets";
-import { MessageCircleHeart, Wind, BookOpen, Sparkles, Gamepad2, Award, HandHeart, ScrollText, Loader2 } from "lucide-react";
+import { MessageCircleHeart, Wind, BookOpen, Sparkles, Gamepad2, Award, HandHeart, ScrollText, Library, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const TILES = [
   { key: "chat", to: "chat", label: "Talk to Sunny", icon: MessageCircleHeart, bg: "#E8DFF5", span: "sm:col-span-2" },
+  { key: "library", to: "library", label: "Story Library", icon: Library, bg: "#FFE3B3", span: "" },
   { key: "prayer", to: "prayer", label: "Prayer Corner", icon: HandHeart, bg: "#EAF0FB", span: "" },
   { key: "promises", to: "promises", label: "God's Promises", icon: ScrollText, bg: "#FFF1CF", span: "" },
   { key: "breathe", to: "breathe", label: "Breathe & Calm", icon: Wind, bg: "#D8F3DC", span: "" },
-  { key: "story", to: "story", label: "Story Time", icon: BookOpen, bg: "#FFE3B3", span: "" },
+  { key: "story", to: "story", label: "Make a Story", icon: BookOpen, bg: "#FFD9C2", span: "" },
   { key: "affirmations", to: "affirmations", label: "Happy Words", icon: Sparkles, bg: "#FFD9D4", span: "" },
   { key: "games", to: "games", label: "Calm Games", icon: Gamepad2, bg: "#CDEAFE", span: "" },
   { key: "badges", to: "badges", label: "My Badges", icon: Award, bg: "#FCE7A0", span: "" },

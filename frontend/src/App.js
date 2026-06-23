@@ -10,6 +10,7 @@ import KidHome from "@/pages/KidHome";
 import ChatBuddy from "@/pages/ChatBuddy";
 import Breathe from "@/pages/Breathe";
 import StoryTime from "@/pages/StoryTime";
+import StoryLibrary from "@/pages/StoryLibrary";
 import Affirmations from "@/pages/Affirmations";
 import Games from "@/pages/Games";
 import Badges from "@/pages/Badges";
@@ -62,6 +63,7 @@ function App() {
             <Route path="/kid/:childId/chat" element={<Protected><ChatBuddy /></Protected>} />
             <Route path="/kid/:childId/breathe" element={<Protected><Breathe /></Protected>} />
             <Route path="/kid/:childId/story" element={<Protected><StoryTime /></Protected>} />
+            <Route path="/kid/:childId/library" element={<Protected><StoryLibrary /></Protected>} />
             <Route path="/kid/:childId/affirmations" element={<Protected><Affirmations /></Protected>} />
             <Route path="/kid/:childId/games" element={<Protected><Games /></Protected>} />
             <Route path="/kid/:childId/badges" element={<Protected><Badges /></Protected>} />

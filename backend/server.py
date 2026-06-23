@@ -28,6 +28,8 @@ from bson import ObjectId
 from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 from emergentintegrations.llm.openai import OpenAITextToSpeech
 
+from books import list_books, get_book
+
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
@@ -146,8 +148,8 @@ class StoryInput(BaseModel):
 
 class TTSInput(BaseModel):
     text: str
-    voice: str = "ash"
-    speed: float = 1.12
+    voice: str = "coral"
+    speed: float = 0.92
 
 class ActivityInput(BaseModel):
     type: str          # breathing | game | story | affirmation | chat
@@ -172,6 +174,11 @@ DAILY_VERSES = [
     {"text": "God's love for you never, ever ends.", "ref": "Psalm 136:1"},
     {"text": "You are the light of the world. Let your light shine!", "ref": "Matthew 5:14"},
     {"text": "Come to me when you are tired, and I will give you rest.", "ref": "Matthew 11:28"},
+    {"text": "Jesus said, 'I am with you always.'", "ref": "Matthew 28:20"},
+    {"text": "Jesus loves you so much that He calls you His friend.", "ref": "John 15:15"},
+    {"text": "For God so loved the world that He gave His only Son, Jesus.", "ref": "John 3:16"},
+    {"text": "Jesus is the Good Shepherd, and He knows you by name.", "ref": "John 10:14"},
+    {"text": "Nothing can ever separate you from the love of Jesus.", "ref": "Romans 8:39"},
 ]
 DAILY_AFFIRMATIONS = [
     "I am loved by God, exactly as I am.",
@@ -258,7 +265,8 @@ def buddy_system_prompt(child_name: str, age: int) -> str:
         f"a {age}-year-old child, in a Christian faith-based kids app called Brighter Dayz. "
         "You speak warmly, simply, and with lots of encouragement, the way a kind Sunday-school teacher "
         "would talk to a young child. Use short sentences and easy words appropriate for the child's age. "
-        "Gently weave in God's love, hope, and simple Bible truths when it fits naturally, without being preachy. "
+        "Gently weave in the love of God and Jesus, hope, and simple Bible truths when it fits naturally, without being preachy. "
+        "Remind the child often, in warm and simple ways, that Jesus loves them very much and is always close to them. "
         "Help the child name and understand their feelings, and suggest small healthy coping ideas like "
         "deep breaths, talking to a trusted grown-up, drawing, or saying a short prayer. "
         "You are NOT a therapist or doctor and never give medical or diagnosis advice. "
@@ -637,7 +645,7 @@ async def gen_affirmation(data: AffirmationInput, user: dict = Depends(get_curre
     feeling = f" The child is feeling {data.feeling}." if data.feeling else ""
     system = ("You write a single short, uplifting, Christian faith-based affirmation for a child "
               f"around {data.age} years old. One sentence, warm, simple words, present tense, first person ('I am...'). "
-              "Gently reflect God's love. No quotes, no emojis, no extra text. Just the affirmation sentence.")
+              "Gently reflect God's love and that Jesus loves them dearly. No quotes, no emojis, no extra text. Just the affirmation sentence.")
     chat_inst = make_chat(f"affirm-{uuid.uuid4()}", system)
     try:
         resp = await chat_inst.send_message(UserMessage(text=f"Write one affirmation.{feeling}"))
@@ -658,7 +666,7 @@ async def gen_story(data: StoryInput, user: dict = Depends(get_current_user)):
     else:
         flavor = ("Tell a short, gentle real-life story for a young child about an everyday situation they might face "
                   "(like feeling nervous at school, missing a friend, being scared at night, or sharing), and how they "
-                  "found comfort, courage, and hope, with a gentle reminder that God is with them.")
+                  "found comfort, courage, and hope, with a gentle reminder that God and Jesus are always with them and love them dearly.")
     topic = f" The story should relate to: {data.topic}." if data.topic else ""
     system = (f"You are a warm children's storyteller for a Christian kids app. {flavor} "
               f"Write for a child around {data.age} years old. Keep it 150-220 words, simple words, short paragraphs, "
@@ -697,6 +705,19 @@ async def list_stories(child_id: str, user: dict = Depends(get_current_user)):
 @api_router.get("/scriptures")
 async def scriptures():
     return {"categories": SCRIPTURE_LIBRARY}
+
+
+@api_router.get("/books")
+async def books():
+    return {"books": list_books()}
+
+
+@api_router.get("/books/{book_id}")
+async def book_detail(book_id: str):
+    b = get_book(book_id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Book not found")
+    return b
 
 @api_router.post("/prayer/generate")
 async def gen_prayer(data: PrayerGenInput, user: dict = Depends(get_current_user)):
@@ -749,7 +770,7 @@ async def tts(data: TTSInput, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Nothing to read")
     try:
         engine = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
-        audio_b64 = await engine.generate_speech_base64(text=text, model="tts-1", voice=data.voice, speed=data.speed)
+        audio_b64 = await engine.generate_speech_base64(text=text, model="tts-1-hd", voice=data.voice, speed=data.speed)
         return {"audio": f"data:audio/mp3;base64,{audio_b64}"}
     except Exception as e:
         logger.exception("tts failed")
