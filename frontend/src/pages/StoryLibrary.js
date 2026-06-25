@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "@/lib/api";
 import KidShell from "@/components/KidShell";
-import ReadAloud from "@/components/ReadAloud";
+import VoiceNarration from "@/components/VoiceNarration";
 import { ASSETS } from "@/lib/assets";
 import { Loader2, ArrowLeft, BookOpen, Clock } from "lucide-react";
 
@@ -60,7 +60,7 @@ export default function StoryLibrary() {
                 <h2 className="font-fredoka text-2xl font-bold text-[#1D3557]">{open.emoji} {open.title}</h2>
                 <p className="text-sm font-semibold text-[#F4A261]">{open.theme}</p>
               </div>
-              <ReadAloud text={`${open.title}. ${open.body}`} voice="coral" label="Read aloud" testid="book-read" />
+              <VoiceNarration refType="book" refId={open.id} text={`${open.title}. ${open.body}`} aiLabel="Read aloud" />
             </div>
             <div className="prose mt-3 text-lg leading-relaxed text-[#1D3557] whitespace-pre-line">{open.body}</div>
           </div>

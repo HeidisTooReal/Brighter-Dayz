@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import api from "@/lib/api";
 import KidShell from "@/components/KidShell";
 import ReadAloud from "@/components/ReadAloud";
+import VoiceNarration from "@/components/VoiceNarration";
 import { ASSETS } from "@/lib/assets";
 import { Loader2, BookOpen, Sparkles } from "lucide-react";
 
@@ -27,8 +28,8 @@ export default function StoryTime() {
     setLoading(true); setStory(null);
     try {
       const { data } = await api.post("/story/generate", { kind, topic, age: child?.age || 8 });
-      setStory(data);
-      await api.post(`/children/${childId}/stories/save`, data);
+      const savedRes = await api.post(`/children/${childId}/stories/save`, data);
+      setStory({ ...data, id: savedRes.data.id });
       await api.post(`/children/${childId}/activities`, { type: "story", detail: data.title });
       api.get(`/children/${childId}/stories`).then((r) => setSaved(r.data));
     } catch (e) {
@@ -67,7 +68,11 @@ export default function StoryTime() {
           <div data-testid="story-output" className="mt-6 rounded-3xl bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-3 mb-3">
               <h2 className="font-fredoka text-2xl font-bold text-[#1D3557]">{story.title}</h2>
-              <ReadAloud text={`${story.title}. ${story.body}`} voice="coral" label="Read aloud" testid="story-read" />
+              {story.id ? (
+                <VoiceNarration refType="story" refId={story.id} text={`${story.title}. ${story.body}`} aiLabel="Read aloud" />
+              ) : (
+                <ReadAloud text={`${story.title}. ${story.body}`} voice="coral" label="Read aloud" testid="story-read" />
+              )}
             </div>
             <div className="prose text-lg leading-relaxed text-[#1D3557] whitespace-pre-line">{story.body}</div>
           </div>

@@ -17,7 +17,7 @@ import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Form, Header, Query
 from fastapi.responses import StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -29,6 +29,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 from emergentintegrations.llm.openai import OpenAITextToSpeech
 
 from books import list_books, get_book
+from storage import init_storage, put_object, get_object, APP_NAME as STORAGE_APP
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -719,6 +720,109 @@ async def book_detail(book_id: str):
         raise HTTPException(status_code=404, detail="Book not found")
     return b
 
+# ---------------------------------------------------------------------------
+# Parent voice narrations (record your own voice to read stories)
+# ---------------------------------------------------------------------------
+MAX_NARRATION_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
+async def _user_id_from_token(token: str) -> Optional[str]:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("sub")
+    except Exception:
+        return None
+
+
+@api_router.post("/narrations")
+async def upload_narration(
+    file: UploadFile = File(...),
+    ref_type: str = Form(...),
+    ref_id: str = Form(...),
+    label: str = Form("My voice"),
+    user: dict = Depends(get_current_user),
+):
+    if ref_type not in ("book", "story"):
+        raise HTTPException(status_code=400, detail="Invalid ref_type")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty recording")
+    if len(data) > MAX_NARRATION_BYTES:
+        raise HTTPException(status_code=413, detail="Recording is too long. Please keep it under 20 MB.")
+    content_type = file.content_type or "audio/webm"
+    if not content_type.startswith("audio/"):
+        raise HTTPException(status_code=400, detail="File must be audio")
+    ext = {"audio/webm": "webm", "audio/mpeg": "mp3", "audio/mp4": "m4a",
+           "audio/ogg": "ogg", "audio/wav": "wav"}.get(content_type, "webm")
+    path = f"{STORAGE_APP}/narrations/{user['_id']}/{uuid.uuid4()}.{ext}"
+    try:
+        result = await asyncio.to_thread(put_object, path, data, content_type)
+    except Exception:
+        logger.exception("narration upload failed")
+        raise HTTPException(status_code=503, detail="Could not save your recording. Please try again.")
+    # Replace any existing recording for this story (one per user per story)
+    await db.narrations.update_many(
+        {"user_id": user["_id"], "ref_type": ref_type, "ref_id": ref_id, "is_deleted": {"$ne": True}},
+        {"$set": {"is_deleted": True}},
+    )
+    doc = {"id": str(uuid.uuid4()), "user_id": user["_id"], "ref_type": ref_type, "ref_id": ref_id,
+           "label": (label or "My voice").strip()[:30], "storage_path": result["path"],
+           "content_type": content_type, "size": result.get("size", len(data)),
+           "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.narrations.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/narrations")
+async def my_narrations(user: dict = Depends(get_current_user)):
+    items = await db.narrations.find(
+        {"user_id": user["_id"], "is_deleted": {"$ne": True}},
+        {"_id": 0, "storage_path": 0},
+    ).sort("created_at", -1).to_list(500)
+    return {"narrations": items}
+
+
+@api_router.get("/narrations/{ref_type}/{ref_id}")
+async def narration_for(ref_type: str, ref_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.narrations.find_one(
+        {"user_id": user["_id"], "ref_type": ref_type, "ref_id": ref_id, "is_deleted": {"$ne": True}},
+        {"_id": 0, "storage_path": 0},
+    )
+    return {"narration": doc}
+
+
+@api_router.get("/narration-audio/{narration_id}")
+async def narration_audio(narration_id: str, authorization: str = Header(None), auth: str = Query(None)):
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+    elif auth:
+        token = auth
+    if not token:
+        raise HTTPException(status_code=401, detail="Not signed in")
+    user_id = await _user_id_from_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    doc = await db.narrations.find_one({"id": narration_id, "user_id": user_id, "is_deleted": {"$ne": True}})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    try:
+        content, ctype = await asyncio.to_thread(get_object, doc["storage_path"])
+    except Exception:
+        logger.exception("narration fetch failed")
+        raise HTTPException(status_code=503, detail="Could not play the recording.")
+    return Response(content=content, media_type=doc.get("content_type", ctype))
+
+
+@api_router.delete("/narrations/{narration_id}")
+async def delete_narration(narration_id: str, user: dict = Depends(get_current_user)):
+    await db.narrations.update_one(
+        {"id": narration_id, "user_id": user["_id"]},
+        {"$set": {"is_deleted": True}},
+    )
+    return {"ok": True}
+
 @api_router.post("/prayer/generate")
 async def gen_prayer(data: PrayerGenInput, user: dict = Depends(get_current_user)):
     ctx = ""
@@ -837,6 +941,12 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.children.create_index("parent_id")
     await db.moods.create_index("child_id")
+    await db.narrations.create_index([("user_id", 1), ("ref_type", 1), ("ref_id", 1)])
+    try:
+        await asyncio.to_thread(init_storage)
+        logger.info("Object storage initialized")
+    except Exception:
+        logger.exception("Object storage init failed (narration upload may be unavailable)")
     admin_email = os.environ.get("ADMIN_EMAIL", "parent@brighterdayz.org")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Sunshine123")
     existing = await db.users.find_one({"email": admin_email})

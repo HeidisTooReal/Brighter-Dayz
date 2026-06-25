@@ -1,5 +1,14 @@
 # Brighter Dayz — PRD
 
+## Changelog — 2026-06-25 (this session)
+- **Voice softer/natural:** TTS switched to OpenAI `tts-1-hd`, voice `coral`, speed `0.92` (backend TTSInput + /tts; ReadAloud default voice now `coral`).
+- **More Jesus:** strengthened Sunny system prompt (Jesus loves you), added 5 Jesus-centered DAILY_VERSES, Jesus woven into affirmation/real-life story prompts.
+- **Story Library (NEW):** `/app/backend/books.py` = 20 ready-to-read books (10 Bible/Jesus + 10 everyday-life). Endpoints `GET /api/books`, `GET /api/books/{id}`. Frontend page `StoryLibrary.js` at route `/kid/:childId/library`, with All/Bible/Real-Life filters; KidHome tile "Story Library" added, AI generator renamed "Make a Story".
+- **Record-my-voice narration (NEW):** parent records own voice to replace AI per story. `/app/backend/storage.py` = Emergent object storage helpers (init/put/get). Endpoints: `POST /api/narrations` (multipart), `GET /api/narrations`, `GET /api/narrations/{ref_type}/{ref_id}`, `GET /api/narration-audio/{id}?auth=token` (query-param auth for <audio>), `DELETE /api/narrations/{id}`. Collection `narrations` (user-owned; soft-delete; one per user+ref). Frontend `VoiceNarration.js` (MediaRecorder) used in StoryLibrary reader + StoryTime. Behavior: when a recording exists, child hears ONLY the grown-up's voice (AI hidden); else AI read-aloud + record button. StoryTime now saves story first so AI stories have an id to narrate.
+- **Deploy fixes:** removed `**/.env` from `.dockerignore`; removed `.env*` and `memory/test_credentials.md` from `.gitignore` so Emergent includes them. deployment_agent: PASS.
+- **Verified:** backend narration flow e2e via curl (upload/list/get/stream 200/delete). Story Library + reader render verified via screenshot. NOTE: actual mic recording not exercised in automation (needs real browser mic permission) — user will validate by recording their voice.
+
+
 ## Original Problem Statement
 A faith-based (Christian/biblical) mental health app for school-age children (ages 5–14),
 a companion to BetterDayz.org. Warm, hopeful, safe, and playful.
