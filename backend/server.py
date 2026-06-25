@@ -40,6 +40,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+OWNER_EMAIL = os.environ.get('ADMIN_EMAIL', 'parent@brighterdayz.org')
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 JWT_ALGORITHM = "HS256"
 MIN_SELF_SIGNUP_AGE = 13   # Google Play / COPPA minimum age for self sign-up without a parent
@@ -762,20 +763,25 @@ async def delete_prayer(child_id: str, prayer_id: str, user: dict = Depends(get_
     return {"ok": True}
 
 # ---------------------------------------------------------------------------
-# Text to speech (read aloud) — uses the parent's cloned voice when available
+# Text to speech (read aloud) — uses the app's built-in cloned voice for everyone
 # ---------------------------------------------------------------------------
+
+async def _get_app_voice_id() -> Optional[str]:
+    cfg = await db.app_config.find_one({"key": "app_voice"})
+    return cfg.get("voice_id") if cfg else None
+
 
 @api_router.post("/tts")
 async def tts(data: TTSInput, user: dict = Depends(get_current_user)):
     text = (data.text or "")[:4000]
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nothing to read")
-    # Prefer the user's cloned voice (ElevenLabs) if they set one up
+    # Prefer the app's built-in cloned voice (set by the owner) for everyone
     if voiceclone.is_enabled():
-        profile = await db.voice_profiles.find_one({"user_id": user["_id"]})
-        if profile and profile.get("voice_id"):
+        voice_id = await _get_app_voice_id()
+        if voice_id:
             try:
-                audio = await asyncio.to_thread(voiceclone.synthesize, profile["voice_id"], text)
+                audio = await asyncio.to_thread(voiceclone.synthesize, voice_id, text)
                 audio_b64 = base64.b64encode(audio).decode()
                 return {"audio": f"data:audio/mp3;base64,{audio_b64}", "source": "clone"}
             except Exception:
@@ -790,23 +796,29 @@ async def tts(data: TTSInput, user: dict = Depends(get_current_user)):
 
 
 # ---------------------------------------------------------------------------
-# Voice cloning — record your own voice once, used for ALL read-aloud
+# App voice — the OWNER records once; this voice is used app-wide for everyone
 # ---------------------------------------------------------------------------
 MAX_CLONE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 
-@api_router.get("/voice-clone")
-async def get_voice_clone(user: dict = Depends(get_current_user)):
-    profile = await db.voice_profiles.find_one({"user_id": user["_id"]}, {"_id": 0, "user_id": 0})
-    return {"enabled": voiceclone.is_enabled(), "profile": profile}
+def _is_owner(user: dict) -> bool:
+    return (user.get("email") or "").lower() == OWNER_EMAIL.lower()
 
 
-@api_router.post("/voice-clone")
-async def create_voice_clone(
+@api_router.get("/app-voice")
+async def get_app_voice(user: dict = Depends(get_current_user)):
+    cfg = await db.app_config.find_one({"key": "app_voice"}, {"_id": 0, "key": 0})
+    return {"enabled": voiceclone.is_enabled(), "is_owner": _is_owner(user), "voice": cfg}
+
+
+@api_router.post("/app-voice")
+async def set_app_voice(
     file: UploadFile = File(...),
-    name: str = Form("My voice"),
+    name: str = Form("Sunny"),
     user: dict = Depends(get_current_user),
 ):
+    if not _is_owner(user):
+        raise HTTPException(status_code=403, detail="Only the app owner can set the app voice.")
     if not voiceclone.is_enabled():
         raise HTTPException(status_code=503, detail="Voice cloning is not configured.")
     data = await file.read()
@@ -817,33 +829,35 @@ async def create_voice_clone(
     content_type = file.content_type or "audio/webm"
     if not content_type.startswith("audio/"):
         raise HTTPException(status_code=400, detail="File must be audio")
-    # Remove any previous clone for this user (ElevenLabs + DB)
-    existing = await db.voice_profiles.find_one({"user_id": user["_id"]})
+    # Remove the previous app voice clone (ElevenLabs) before creating a new one
+    existing = await db.app_config.find_one({"key": "app_voice"})
     if existing and existing.get("voice_id"):
         await asyncio.to_thread(voiceclone.delete_clone, existing["voice_id"])
-    clean_name = (name or "My voice").strip()[:40]
-    eleven_name = f"BrighterDayz-{user['_id'][:8]}-{clean_name}"[:48]
+    clean_name = (name or "Sunny").strip()[:40]
+    eleven_name = f"BrighterDayz-AppVoice-{clean_name}"[:48]
     try:
         voice_id = await asyncio.to_thread(voiceclone.create_clone, eleven_name, data, content_type)
     except Exception as e:
-        logger.exception("voice clone failed")
+        logger.exception("app voice clone failed")
         msg = str(e)
         if "can_not_use_instant_voice_cloning" in msg or "subscription" in msg.lower():
             raise HTTPException(status_code=402, detail="Voice cloning needs an ElevenLabs paid plan (Starter or above). Please upgrade and try again.")
-        raise HTTPException(status_code=503, detail="Could not create your voice. Please try recording again.")
-    doc = {"user_id": user["_id"], "voice_id": voice_id, "name": clean_name,
-           "created_at": datetime.now(timezone.utc).isoformat()}
-    await db.voice_profiles.update_one({"user_id": user["_id"]}, {"$set": doc}, upsert=True)
-    return {"profile": {"voice_id": voice_id, "name": clean_name, "created_at": doc["created_at"]}}
+        raise HTTPException(status_code=503, detail="Could not create the voice. Please try recording again.")
+    voice = {"voice_id": voice_id, "name": clean_name, "updated_at": datetime.now(timezone.utc).isoformat()}
+    await db.app_config.update_one({"key": "app_voice"}, {"$set": {**voice, "key": "app_voice"}}, upsert=True)
+    return {"voice": voice}
 
 
-@api_router.delete("/voice-clone")
-async def delete_voice_clone(user: dict = Depends(get_current_user)):
-    existing = await db.voice_profiles.find_one({"user_id": user["_id"]})
+@api_router.delete("/app-voice")
+async def delete_app_voice(user: dict = Depends(get_current_user)):
+    if not _is_owner(user):
+        raise HTTPException(status_code=403, detail="Only the app owner can change the app voice.")
+    existing = await db.app_config.find_one({"key": "app_voice"})
     if existing and existing.get("voice_id"):
         await asyncio.to_thread(voiceclone.delete_clone, existing["voice_id"])
-    await db.voice_profiles.delete_one({"user_id": user["_id"]})
+    await db.app_config.delete_one({"key": "app_voice"})
     return {"ok": True}
+
 
 # ---------------------------------------------------------------------------
 # Parent dashboard summary
@@ -906,7 +920,7 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.children.create_index("parent_id")
     await db.moods.create_index("child_id")
-    await db.voice_profiles.create_index("user_id", unique=True)
+    await db.app_config.create_index("key", unique=True)
     admin_email = os.environ.get("ADMIN_EMAIL", "parent@brighterdayz.org")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Sunshine123")
     existing = await db.users.find_one({"email": admin_email})

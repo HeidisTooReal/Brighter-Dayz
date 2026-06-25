@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
-import { Mic, Square, Play, Pause, Loader2, Check, Trash2, RefreshCw, Sparkles } from "lucide-react";
+import { Mic, Square, Play, Loader2, Check, Trash2, RefreshCw, Sparkles } from "lucide-react";
 
-const SCRIPT = `Hello, my love. I am so happy you are here today. Take a slow, deep breath with me. In... and out. You are safe, you are loved, and you are never alone. God made you wonderfully, and so did I. No matter how big your feelings are, we can face them together. When you feel worried or sad, remember that Jesus is always close, holding your hand. You are brave. You are kind. You are my sunshine. Let's read a story, say a little prayer, and remember that tomorrow is a brand new day, full of hope and bright with love.`;
+const SCRIPT = `Hello, my friend. I am so happy you are here today. Take a slow, deep breath with me. In... and out. You are safe, you are loved, and you are never alone. God made you wonderfully. No matter how big your feelings are, we can face them together. When you feel worried or sad, remember that Jesus is always close, holding your hand. You are brave. You are kind. You are full of sunshine. Let's read a story, say a little prayer, and remember that tomorrow is a brand new day, full of hope and bright with love.`;
 
 function pickMimeType() {
   const candidates = ["audio/webm", "audio/mp4", "audio/ogg"];
@@ -12,7 +12,8 @@ function pickMimeType() {
 
 export default function VoiceCloneCard() {
   const [enabled, setEnabled] = useState(true);
-  const [profile, setProfile] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [voice, setVoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -32,11 +33,12 @@ export default function VoiceCloneCard() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/voice-clone");
+      const { data } = await api.get("/app-voice");
       setEnabled(data.enabled);
-      setProfile(data.profile || null);
+      setIsOwner(data.is_owner);
+      setVoice(data.voice || null);
     } catch {
-      setProfile(null);
+      setVoice(null);
     } finally {
       setLoading(false);
     }
@@ -90,21 +92,21 @@ export default function VoiceCloneCard() {
     new Audio(previewUrlRef.current).play();
   };
 
-  const saveClone = async () => {
+  const saveVoice = async () => {
     if (!recordedBlob) return;
     setSaving(true); setError(""); setOkMsg("");
     try {
       const ext = (recordedBlob.type.includes("mp4") && "m4a") || (recordedBlob.type.includes("ogg") && "ogg") || "webm";
       const fd = new FormData();
       fd.append("file", recordedBlob, `voice.${ext}`);
-      fd.append("name", "My voice");
-      const { data } = await api.post("/voice-clone", fd, { headers: { "Content-Type": "multipart/form-data" } });
-      setProfile(data.profile);
+      fd.append("name", "Sunny");
+      const { data } = await api.post("/app-voice", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setVoice(data.voice);
       setRecordedBlob(null);
-      setOkMsg("Your voice is ready! Sunny and every story will now read in your voice. 💛");
+      setOkMsg("Done! Sunny and every story now read in your voice for all children. 💛");
     } catch (e) {
       const detail = e?.response?.data?.detail;
-      setError(typeof detail === "string" ? detail : "Could not create your voice. Please try again.");
+      setError(typeof detail === "string" ? detail : "Could not create the voice. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -113,7 +115,7 @@ export default function VoiceCloneCard() {
   const testVoice = async () => {
     setTesting(true); setError("");
     try {
-      const { data } = await api.post("/tts", { text: "Hi sweetheart, it's me. I love you to the moon and back." });
+      const { data } = await api.post("/tts", { text: "Hi there, friend. It's Sunny. I'm so glad you're here today." });
       const audio = new Audio(data.audio);
       testAudioRef.current = audio;
       await audio.play();
@@ -124,16 +126,27 @@ export default function VoiceCloneCard() {
     }
   };
 
-  const removeClone = async () => {
-    if (!window.confirm("Remove your voice? Read-aloud will go back to the gentle app voice.")) return;
+  const removeVoice = async () => {
+    if (!window.confirm("Remove the app voice? Read-aloud will go back to the gentle default voice for everyone.")) return;
     try {
-      await api.delete("/voice-clone");
-      setProfile(null);
+      await api.delete("/app-voice");
+      setVoice(null);
       setOkMsg("");
     } catch {
-      setError("Could not remove your voice.");
+      setError("Could not remove the voice.");
     }
   };
+
+  if (loading) {
+    return (
+      <div className="mb-8 rounded-2xl border-2 border-[#C9E4DE] bg-white p-6 shadow-sm">
+        <Loader2 className="h-6 w-6 animate-spin text-[#457B9D]" />
+      </div>
+    );
+  }
+
+  // Only the app owner/developer sees this control.
+  if (!isOwner) return null;
 
   const mmss = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 
@@ -141,32 +154,31 @@ export default function VoiceCloneCard() {
     <div data-testid="voice-clone-card" className="mb-8 rounded-2xl border-2 border-[#C9E4DE] bg-white p-6 shadow-sm">
       <div className="flex items-center gap-2 mb-1">
         <Sparkles className="h-6 w-6 text-[#2A9D8F]" />
-        <h2 className="text-lg font-bold text-[#1D3557] font-['Nunito']">Your voice as Sunny</h2>
+        <h2 className="text-lg font-bold text-[#1D3557] font-['Nunito']">Sunny's Voice (app-wide)</h2>
+        <span className="ml-1 rounded-full bg-[#E8F5F1] px-2 py-0.5 text-xs font-semibold text-[#2A9D8F]">Owner only</span>
       </div>
       <p className="text-sm text-[#64748b] mb-4">
-        Record yourself once, and your child will hear <b>your voice</b> everywhere — Sunny's chat, every storybook, prayers and happy words.
+        Record once, and <b>every child using Brighter Dayz</b> hears your voice as Sunny and the story reader — chat, books, prayers, and happy words.
       </p>
 
-      {loading ? (
-        <Loader2 className="h-6 w-6 animate-spin text-[#457B9D]" />
-      ) : !enabled ? (
-        <p className="rounded-xl bg-[#FFF6F4] p-4 text-sm text-[#7A2E26]">Voice cloning isn't configured yet. Please add your ElevenLabs API key.</p>
-      ) : profile ? (
+      {!enabled ? (
+        <p className="rounded-xl bg-[#FFF6F4] p-4 text-sm text-[#7A2E26]">Voice cloning isn't configured yet. Please add the ElevenLabs API key.</p>
+      ) : voice ? (
         <div data-testid="voice-clone-active" className="flex flex-col gap-3">
           <div className="flex items-center gap-2 rounded-xl bg-[#E8F5F1] p-4">
             <Check className="h-5 w-5 text-[#2A9D8F]" />
-            <span className="font-semibold text-[#1D3557]">Your voice is set up and in use across the app.</span>
+            <span className="font-semibold text-[#1D3557]">The app voice is live for all children.</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <button data-testid="voice-test" onClick={testVoice} disabled={testing}
               className="inline-flex items-center gap-2 rounded-full bg-[#457B9D] px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60">
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />} Hear a sample
             </button>
-            <button data-testid="voice-rerecord" onClick={() => setProfile(null)}
+            <button data-testid="voice-rerecord" onClick={() => setVoice(null)}
               className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#457B9D] shadow-sm border border-[#E2E8F0]">
               <RefreshCw className="h-4 w-4" /> Re-record
             </button>
-            <button data-testid="voice-remove" onClick={removeClone}
+            <button data-testid="voice-remove" onClick={removeVoice}
               className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#E76F51] shadow-sm border border-[#FCE0D8]">
               <Trash2 className="h-4 w-4" /> Remove
             </button>
@@ -192,7 +204,7 @@ export default function VoiceCloneCard() {
               ) : (
                 <button data-testid="voice-record" onClick={startRecording}
                   className="inline-flex items-center gap-2 rounded-full bg-[#2A9D8F] px-5 py-3 font-bold text-white shadow-sm transition hover:-translate-y-0.5">
-                  <Mic className="h-5 w-5" /> Record my voice
+                  <Mic className="h-5 w-5" /> Record the app voice
                 </button>
               )}
             </div>
@@ -202,9 +214,9 @@ export default function VoiceCloneCard() {
                 className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#457B9D] shadow-sm border border-[#E2E8F0]">
                 <Play className="h-4 w-4" /> Listen back
               </button>
-              <button data-testid="voice-save" onClick={saveClone} disabled={saving}
+              <button data-testid="voice-save" onClick={saveVoice} disabled={saving}
                 className="inline-flex items-center gap-2 rounded-full bg-[#2A9D8F] px-5 py-2.5 font-bold text-white shadow-sm disabled:opacity-60">
-                {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating your voice…</> : <><Check className="h-4 w-4" /> Use this as my voice</>}
+                {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating the voice…</> : <><Check className="h-4 w-4" /> Use this as Sunny's voice</>}
               </button>
               <button data-testid="voice-redo" onClick={startRecording}
                 className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#E76F51] shadow-sm border border-[#FCE0D8]">

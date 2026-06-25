@@ -1,6 +1,11 @@
 # Brighter Dayz — PRD
 
-## Changelog — 2026-06-25 (voice cloning pivot)
+## Changelog — 2026-06-25 (app-wide owner voice)
+- **Single global app voice (set by OWNER):** corrected from per-parent to one developer/owner voice used app-wide for ALL children. Owner = account whose email == ADMIN_EMAIL (`parent@brighterdayz.org`).
+  - Backend: stored in `app_config` doc `{key:"app_voice", voice_id, name, updated_at}`. Endpoints `GET /api/app-voice` (returns enabled/is_owner/voice), `POST /api/app-voice` (owner-only, multipart, creates ElevenLabs clone), `DELETE /api/app-voice` (owner-only). `/api/tts` uses this global voice for every user; falls back to OpenAI `tts-1-hd` Coral. `OWNER_EMAIL` const added; removed per-user `voice_profiles`.
+  - Frontend: `components/VoiceCloneCard.js` now renders ONLY for owner (`is_owner`), titled "Sunny's Voice (app-wide)", record/preview/save/test/remove via `/api/app-voice`.
+  - Verified e2e via curl with real ElevenLabs key: set→voice_id, `/api/tts` source=clone for all, delete→source=ai. Owner card renders behind Parent PIN (2468). NOTE: live mic record→save needs real browser mic — owner to validate on device.
+
 - **Voice cloning (ElevenLabs) — your voice everywhere:** Parent records ~30–60s once → Instant Voice Clone created → `voice_id` saved in `voice_profiles` (one per user). ALL read-aloud (`/api/tts`) now uses the cloned voice when present, else falls back to OpenAI `tts-1-hd` Coral. Covers Sunny chat, books, AI stories, affirmations, prayers, daily verse.
   - Backend: `/app/backend/voiceclone.py` (elevenlabs SDK 2.54.0; `voices.ivc.create`, `text_to_speech.convert` model `eleven_multilingual_v2`, `voices.delete`). Endpoints: `GET/POST/DELETE /api/voice-clone`. `/api/tts` returns `source: clone|ai`.
   - Frontend: `components/VoiceCloneCard.js` (MediaRecorder) at top of Parent Dashboard — record/preview/save/test/re-record/remove, with a warm reading script.
