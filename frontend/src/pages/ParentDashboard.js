@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { ASSETS, MOODS, MOOD_SCORE } from "@/lib/assets";
 import { ArrowLeft, Trash2, Star, Flame, Activity, Smile, Loader2, ShieldAlert, Check } from "lucide-react";
 import LegalFooter from "@/components/LegalFooter";
+import VoiceCloneCard from "@/components/VoiceCloneCard";
 
 const moodMeta = (key) => MOODS.find((m) => m.key === key) || { emoji: "🙂", label: key, color: "#ccc" };
 
@@ -63,6 +64,8 @@ export default function ParentDashboard() {
             <p className="text-[#64748b]">A gentle window into your child's well-being.</p>
           </div>
         </div>
+
+        <VoiceCloneCard />
 
         {alerts.length > 0 && (
           <div data-testid="safety-alerts" className="mb-8 rounded-2xl border-2 border-[#FFA69E] bg-[#FFF6F4] p-5">

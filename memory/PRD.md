@@ -1,5 +1,14 @@
 # Brighter Dayz — PRD
 
+## Changelog — 2026-06-25 (voice cloning pivot)
+- **Voice cloning (ElevenLabs) — your voice everywhere:** Parent records ~30–60s once → Instant Voice Clone created → `voice_id` saved in `voice_profiles` (one per user). ALL read-aloud (`/api/tts`) now uses the cloned voice when present, else falls back to OpenAI `tts-1-hd` Coral. Covers Sunny chat, books, AI stories, affirmations, prayers, daily verse.
+  - Backend: `/app/backend/voiceclone.py` (elevenlabs SDK 2.54.0; `voices.ivc.create`, `text_to_speech.convert` model `eleven_multilingual_v2`, `voices.delete`). Endpoints: `GET/POST/DELETE /api/voice-clone`. `/api/tts` returns `source: clone|ai`.
+  - Frontend: `components/VoiceCloneCard.js` (MediaRecorder) at top of Parent Dashboard — record/preview/save/test/re-record/remove, with a warm reading script.
+  - Key: `ELEVENLABS_API_KEY` in backend/.env (user's paid Starter key). EMERGENT_LLM_KEY does NOT work for ElevenLabs.
+  - **Reverted** the earlier per-book recording approach: removed `VoiceNarration.js`, `storage.py`, and `/api/narrations*` endpoints. Story/Library readers use plain `ReadAloud` again (cloned voice flows via `/api/tts`).
+  - **Verified e2e via curl with real key:** clone→`voice_id`, `/api/tts` source=clone, delete→fallback source=ai. Parent card renders (screenshot). NOTE: live mic record→save not exercised in automation (needs real browser mic) — user to validate.
+
+
 ## Changelog — 2026-06-25 (this session)
 - **Voice softer/natural:** TTS switched to OpenAI `tts-1-hd`, voice `coral`, speed `0.92` (backend TTSInput + /tts; ReadAloud default voice now `coral`).
 - **More Jesus:** strengthened Sunny system prompt (Jesus loves you), added 5 Jesus-centered DAILY_VERSES, Jesus woven into affirmation/real-life story prompts.

@@ -8,6 +8,7 @@ import logging
 import uuid
 import secrets
 import json
+import base64
 import asyncio
 from datetime import datetime, timezone, timedelta, date
 
@@ -29,7 +30,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, Strea
 from emergentintegrations.llm.openai import OpenAITextToSpeech
 
 from books import list_books, get_book
-from storage import init_storage, put_object, get_object, APP_NAME as STORAGE_APP
+import voiceclone
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -720,109 +721,6 @@ async def book_detail(book_id: str):
         raise HTTPException(status_code=404, detail="Book not found")
     return b
 
-# ---------------------------------------------------------------------------
-# Parent voice narrations (record your own voice to read stories)
-# ---------------------------------------------------------------------------
-MAX_NARRATION_BYTES = 20 * 1024 * 1024  # 20 MB
-
-
-async def _user_id_from_token(token: str) -> Optional[str]:
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload.get("sub")
-    except Exception:
-        return None
-
-
-@api_router.post("/narrations")
-async def upload_narration(
-    file: UploadFile = File(...),
-    ref_type: str = Form(...),
-    ref_id: str = Form(...),
-    label: str = Form("My voice"),
-    user: dict = Depends(get_current_user),
-):
-    if ref_type not in ("book", "story"):
-        raise HTTPException(status_code=400, detail="Invalid ref_type")
-    data = await file.read()
-    if not data:
-        raise HTTPException(status_code=400, detail="Empty recording")
-    if len(data) > MAX_NARRATION_BYTES:
-        raise HTTPException(status_code=413, detail="Recording is too long. Please keep it under 20 MB.")
-    content_type = file.content_type or "audio/webm"
-    if not content_type.startswith("audio/"):
-        raise HTTPException(status_code=400, detail="File must be audio")
-    ext = {"audio/webm": "webm", "audio/mpeg": "mp3", "audio/mp4": "m4a",
-           "audio/ogg": "ogg", "audio/wav": "wav"}.get(content_type, "webm")
-    path = f"{STORAGE_APP}/narrations/{user['_id']}/{uuid.uuid4()}.{ext}"
-    try:
-        result = await asyncio.to_thread(put_object, path, data, content_type)
-    except Exception:
-        logger.exception("narration upload failed")
-        raise HTTPException(status_code=503, detail="Could not save your recording. Please try again.")
-    # Replace any existing recording for this story (one per user per story)
-    await db.narrations.update_many(
-        {"user_id": user["_id"], "ref_type": ref_type, "ref_id": ref_id, "is_deleted": {"$ne": True}},
-        {"$set": {"is_deleted": True}},
-    )
-    doc = {"id": str(uuid.uuid4()), "user_id": user["_id"], "ref_type": ref_type, "ref_id": ref_id,
-           "label": (label or "My voice").strip()[:30], "storage_path": result["path"],
-           "content_type": content_type, "size": result.get("size", len(data)),
-           "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat()}
-    await db.narrations.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
-
-
-@api_router.get("/narrations")
-async def my_narrations(user: dict = Depends(get_current_user)):
-    items = await db.narrations.find(
-        {"user_id": user["_id"], "is_deleted": {"$ne": True}},
-        {"_id": 0, "storage_path": 0},
-    ).sort("created_at", -1).to_list(500)
-    return {"narrations": items}
-
-
-@api_router.get("/narrations/{ref_type}/{ref_id}")
-async def narration_for(ref_type: str, ref_id: str, user: dict = Depends(get_current_user)):
-    doc = await db.narrations.find_one(
-        {"user_id": user["_id"], "ref_type": ref_type, "ref_id": ref_id, "is_deleted": {"$ne": True}},
-        {"_id": 0, "storage_path": 0},
-    )
-    return {"narration": doc}
-
-
-@api_router.get("/narration-audio/{narration_id}")
-async def narration_audio(narration_id: str, authorization: str = Header(None), auth: str = Query(None)):
-    token = None
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization[7:]
-    elif auth:
-        token = auth
-    if not token:
-        raise HTTPException(status_code=401, detail="Not signed in")
-    user_id = await _user_id_from_token(token)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid session")
-    doc = await db.narrations.find_one({"id": narration_id, "user_id": user_id, "is_deleted": {"$ne": True}})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Recording not found")
-    try:
-        content, ctype = await asyncio.to_thread(get_object, doc["storage_path"])
-    except Exception:
-        logger.exception("narration fetch failed")
-        raise HTTPException(status_code=503, detail="Could not play the recording.")
-    return Response(content=content, media_type=doc.get("content_type", ctype))
-
-
-@api_router.delete("/narrations/{narration_id}")
-async def delete_narration(narration_id: str, user: dict = Depends(get_current_user)):
-    await db.narrations.update_one(
-        {"id": narration_id, "user_id": user["_id"]},
-        {"$set": {"is_deleted": True}},
-    )
-    return {"ok": True}
-
 @api_router.post("/prayer/generate")
 async def gen_prayer(data: PrayerGenInput, user: dict = Depends(get_current_user)):
     ctx = ""
@@ -864,7 +762,7 @@ async def delete_prayer(child_id: str, prayer_id: str, user: dict = Depends(get_
     return {"ok": True}
 
 # ---------------------------------------------------------------------------
-# Text to speech (read aloud)
+# Text to speech (read aloud) — uses the parent's cloned voice when available
 # ---------------------------------------------------------------------------
 
 @api_router.post("/tts")
@@ -872,13 +770,80 @@ async def tts(data: TTSInput, user: dict = Depends(get_current_user)):
     text = (data.text or "")[:4000]
     if not text.strip():
         raise HTTPException(status_code=400, detail="Nothing to read")
+    # Prefer the user's cloned voice (ElevenLabs) if they set one up
+    if voiceclone.is_enabled():
+        profile = await db.voice_profiles.find_one({"user_id": user["_id"]})
+        if profile and profile.get("voice_id"):
+            try:
+                audio = await asyncio.to_thread(voiceclone.synthesize, profile["voice_id"], text)
+                audio_b64 = base64.b64encode(audio).decode()
+                return {"audio": f"data:audio/mp3;base64,{audio_b64}", "source": "clone"}
+            except Exception:
+                logger.exception("cloned-voice tts failed, falling back to default voice")
     try:
         engine = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
         audio_b64 = await engine.generate_speech_base64(text=text, model="tts-1-hd", voice=data.voice, speed=data.speed)
-        return {"audio": f"data:audio/mp3;base64,{audio_b64}"}
+        return {"audio": f"data:audio/mp3;base64,{audio_b64}", "source": "ai"}
     except Exception as e:
         logger.exception("tts failed")
         raise HTTPException(status_code=503, detail="Read aloud is unavailable right now.")
+
+
+# ---------------------------------------------------------------------------
+# Voice cloning — record your own voice once, used for ALL read-aloud
+# ---------------------------------------------------------------------------
+MAX_CLONE_BYTES = 25 * 1024 * 1024  # 25 MB
+
+
+@api_router.get("/voice-clone")
+async def get_voice_clone(user: dict = Depends(get_current_user)):
+    profile = await db.voice_profiles.find_one({"user_id": user["_id"]}, {"_id": 0, "user_id": 0})
+    return {"enabled": voiceclone.is_enabled(), "profile": profile}
+
+
+@api_router.post("/voice-clone")
+async def create_voice_clone(
+    file: UploadFile = File(...),
+    name: str = Form("My voice"),
+    user: dict = Depends(get_current_user),
+):
+    if not voiceclone.is_enabled():
+        raise HTTPException(status_code=503, detail="Voice cloning is not configured.")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty recording")
+    if len(data) > MAX_CLONE_BYTES:
+        raise HTTPException(status_code=413, detail="Recording is too large. Please keep it under 25 MB.")
+    content_type = file.content_type or "audio/webm"
+    if not content_type.startswith("audio/"):
+        raise HTTPException(status_code=400, detail="File must be audio")
+    # Remove any previous clone for this user (ElevenLabs + DB)
+    existing = await db.voice_profiles.find_one({"user_id": user["_id"]})
+    if existing and existing.get("voice_id"):
+        await asyncio.to_thread(voiceclone.delete_clone, existing["voice_id"])
+    clean_name = (name or "My voice").strip()[:40]
+    eleven_name = f"BrighterDayz-{user['_id'][:8]}-{clean_name}"[:48]
+    try:
+        voice_id = await asyncio.to_thread(voiceclone.create_clone, eleven_name, data, content_type)
+    except Exception as e:
+        logger.exception("voice clone failed")
+        msg = str(e)
+        if "can_not_use_instant_voice_cloning" in msg or "subscription" in msg.lower():
+            raise HTTPException(status_code=402, detail="Voice cloning needs an ElevenLabs paid plan (Starter or above). Please upgrade and try again.")
+        raise HTTPException(status_code=503, detail="Could not create your voice. Please try recording again.")
+    doc = {"user_id": user["_id"], "voice_id": voice_id, "name": clean_name,
+           "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.voice_profiles.update_one({"user_id": user["_id"]}, {"$set": doc}, upsert=True)
+    return {"profile": {"voice_id": voice_id, "name": clean_name, "created_at": doc["created_at"]}}
+
+
+@api_router.delete("/voice-clone")
+async def delete_voice_clone(user: dict = Depends(get_current_user)):
+    existing = await db.voice_profiles.find_one({"user_id": user["_id"]})
+    if existing and existing.get("voice_id"):
+        await asyncio.to_thread(voiceclone.delete_clone, existing["voice_id"])
+    await db.voice_profiles.delete_one({"user_id": user["_id"]})
+    return {"ok": True}
 
 # ---------------------------------------------------------------------------
 # Parent dashboard summary
@@ -941,12 +906,7 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.children.create_index("parent_id")
     await db.moods.create_index("child_id")
-    await db.narrations.create_index([("user_id", 1), ("ref_type", 1), ("ref_id", 1)])
-    try:
-        await asyncio.to_thread(init_storage)
-        logger.info("Object storage initialized")
-    except Exception:
-        logger.exception("Object storage init failed (narration upload may be unavailable)")
+    await db.voice_profiles.create_index("user_id", unique=True)
     admin_email = os.environ.get("ADMIN_EMAIL", "parent@brighterdayz.org")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Sunshine123")
     existing = await db.users.find_one({"email": admin_email})
