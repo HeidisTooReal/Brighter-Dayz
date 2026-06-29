@@ -1,5 +1,13 @@
 # Brighter Dayz — PRD
 
+## Bug fix — 2026-06-29 (app voice reverted to AI on preview)
+- **Symptom:** On preview, read-aloud "voice changed" — it was using the OpenAI Coral AI fallback instead of the owner's cloned voice.
+- **Root cause:** Both preview & production share the SAME `ELEVENLABS_API_KEY`, so they share one ElevenLabs voice library. Preview's `app_config.app_voice.voice_id` was `9TxZk...`; when the owner's voice was uploaded to PRODUCTION, the prod POST `/api/app-voice` deleted the existing ElevenLabs voice (`9TxZk`) before creating prod's new clone (`5St5`). That left preview pointing at a deleted voice_id, so `voiceclone.synthesize` threw and `/api/tts` fell back to `source:'ai'`.
+- **Fix:** Re-created the clone on preview from the owner's recording (new voice_id `V1crH5...`) via POST `/api/app-voice`. Preview `/api/tts` now returns `source:'clone'`. Production still has working clone `5St5`. Preview & prod now hold DISTINCT voice_ids, so future re-uploads won't cross-delete.
+- **Verified:** testing_agent iteration_8 — backend 4/4 PASS, frontend Read-aloud e2e PASS (source=clone, ~937KB mp3). retest_needed=false.
+- **Known follow-up (optional, not done):** add a voice_id health probe on GET /api/app-voice + user-facing error toast in ReadAloud.js if /api/tts fails (suggested by tester).
+
+
 ## Changelog — 2026-06-25 (app-wide owner voice)
 - **Single global app voice (set by OWNER):** corrected from per-parent to one developer/owner voice used app-wide for ALL children. Owner = account whose email == ADMIN_EMAIL (`parent@brighterdayz.org`).
   - Backend: stored in `app_config` doc `{key:"app_voice", voice_id, name, updated_at}`. Endpoints `GET /api/app-voice` (returns enabled/is_owner/voice), `POST /api/app-voice` (owner-only, multipart, creates ElevenLabs clone), `DELETE /api/app-voice` (owner-only). `/api/tts` uses this global voice for every user; falls back to OpenAI `tts-1-hd` Coral. `OWNER_EMAIL` const added; removed per-user `voice_profiles`.
