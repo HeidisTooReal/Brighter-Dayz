@@ -113,7 +113,6 @@ export default function AuthPage() {
               {mode === "login" ? "Sign In" : isTeen ? "Let's go!" : "Create Account"}
             </button>
           </form>
-          {mode === "login" && <p className="mt-4 text-center text-sm text-[#457B9D]">Demo: parent@brighterdayz.org / Sunshine123</p>}
           <p className="mt-6 text-center text-xs text-[#94a3b8]">
             By continuing you agree to our{" "}
             <a href="/terms" data-testid="terms-link" className="font-semibold text-[#457B9D] underline">Terms</a>{" "}and{" "}
