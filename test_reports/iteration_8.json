@@ -1,0 +1,24 @@
+{
+  "summary": "Iter-8 verifies the BUG FIX for app-wide cloned 'Sunny' voice. Backend pytest (4/4 PASS): GET /api/app-voice as owner parent@brighterdayz.org returns enabled=true, is_owner=true, voice={voice_id:<non-empty>, name:'Sunny'}; POST /api/tts (authenticated) returns 200 with audio data-URL and source='clone' (NOT 'ai') — confirms the new ElevenLabs clone resolves and synthesizes. Unauthenticated /api/tts is rejected (401/403). Frontend e2e (PASS): logged in as owner, clicked existing child profile (ba790cb2-...), opened Story Library tile, opened first book (book-card-jesus-children), clicked book-read button — captured network response POST /api/tts -> 200 source='clone' audio_len=936866 bytes; UI flipped to 'Stop' indicating audio.play() succeeded. Bug-fix confirmed end-to-end.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_voice_clone.py",
+    "/app/test_reports/pytest/iter8_voice.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py /api/tts: fallback path silently swallows ElevenLabs errors (logger.exception then falls through to OpenAI) which originally masked the dangling voice_id bug. Consider logging the failing voice_id at WARNING level and optionally returning source='ai' with a debug field like 'clone_error' so dashboards/tests can detect future regressions earlier.",
+    "server.py /api/app-voice POST: when create_clone succeeds but the subsequent ElevenLabs voice is later deleted out-of-band (the exact root cause this iteration fixed), there's no health-check on /api/app-voice GET to verify the stored voice_id still exists in ElevenLabs. Optional enhancement: occasionally validate voice_id via voiceclone.synthesize a tiny probe and surface 'voice_healthy: false' to the owner UI so they can re-record proactively.",
+    "ReadAloud.js: catches errors silently with console.warn and never surfaces a user-facing toast/error state. If /api/tts ever 503s, kids get no feedback. Consider showing a small inline message ('Audio unavailable, try again').",
+    "ReadAloud.js still passes voice='coral' even though the backend ignores it when a cloned voice is configured — harmless but dead prop; safe to remove for clarity."
+  ],
+  "updated_files": ["/app/backend/tests/test_voice_clone.py (NEW — 4 voice/TTS tests)"],
+  "success_rate": {"backend": "100% (4/4 voice tests)", "frontend": "100% (Read aloud end-to-end with source='clone')"},
+  "test_credentials": "parent@brighterdayz.org / Sunshine123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "None — used existing demo parent + existing child profile ba790cb2-a85c-484a-9359-de46244f3327.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug fix PASS — Sunny cloned voice works end-to-end. Stored voice_id resolves and synthesizes ~937KB MP3 in <2s. If future testing flakes here, first hit GET /api/app-voice to confirm voice.voice_id is present, then POST /api/tts to confirm source='clone'. If source flips back to 'ai', the ElevenLabs voice was deleted again — re-record via the Parent Dashboard voice setup or POST /api/app-voice as owner.",
+  "rca of the issue": "ROOT CAUSE (already fixed by main agent before this iteration): app_config.app_voice.voice_id pointed at an ElevenLabs voice that had been deleted from the ElevenLabs account. voiceclone.synthesize(voice_id, ...) threw, /api/tts caught it and fell through to OpenAI Coral returning source='ai'. FIX: main agent re-created the clone (new voice_id) and saved it via POST /api/app-voice. VERIFICATION (this iteration): /api/tts now returns source='clone' both in pytest and in the live Story Library Read aloud UI. MITIGATION suggestion above: add a periodic voice_id health probe so future deletions surface immediately to the owner."
+}
