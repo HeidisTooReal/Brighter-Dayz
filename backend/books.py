@@ -363,6 +363,298 @@ BOOKS = [
             "Remember: It's okay to be sad when you miss someone. God holds our tears, and love lasts forever."
         ),
     },
+
+    # ---------------- Bible Heroes ----------------
+    {
+        "id": "hero-esther",
+        "category": "hero",
+        "title": "Queen Esther's Brave Heart",
+        "theme": "Courage to do what is right",
+        "emoji": "👑",
+        "color": "#FFD8E4",
+        "minutes": 2,
+        "body": (
+            "Esther was a kind young woman who became a queen. But she had a secret — she was one of God's people, and a wicked man had made a plan to hurt them.\n\n"
+            "Esther knew she could speak to the king and ask him to help. But going to the king without being called could be dangerous!\n\n"
+            "She prayed and fasted for three days. Then she said, \"Maybe God made me queen for such a time as this.\"\n\n"
+            "With a brave heart, Esther walked into the king's room. She spoke up for her people, and the king listened. God used her courage to save everyone!\n\n"
+            "Remember: God can use you to do brave and good things, right where you are."
+        ),
+    },
+    {
+        "id": "hero-ruth",
+        "category": "hero",
+        "title": "Ruth's Loving Loyalty",
+        "theme": "Loyalty and love",
+        "emoji": "🌾",
+        "color": "#FFE08A",
+        "minutes": 2,
+        "body": (
+            "After a sad time, Ruth's mother-in-law, Naomi, decided to travel back to her homeland, all alone.\n\n"
+            "Ruth could have stayed behind where it was easy. But she loved Naomi dearly.\n\n"
+            "\"Where you go, I will go,\" Ruth said. \"Your people will be my people, and your God will be my God.\"\n\n"
+            "So Ruth went with her. She worked hard in the fields to gather food, and she cared for Naomi every day.\n\n"
+            "God saw Ruth's faithful, loving heart, and He blessed her with a happy new family.\n\n"
+            "Remember: Loving and sticking by others, even when it's hard, is a beautiful gift from God."
+        ),
+    },
+    {
+        "id": "hero-deborah",
+        "category": "hero",
+        "title": "Deborah the Wise Leader",
+        "theme": "Wisdom and courage",
+        "emoji": "🌴",
+        "color": "#B7E4C7",
+        "minutes": 2,
+        "body": (
+            "Deborah was a wise woman who loved God. She was a leader and a judge, and people came from all around to ask her for help.\n\n"
+            "She would sit under a tall palm tree and listen carefully, and God gave her wisdom to make fair choices.\n\n"
+            "One day, God's people were afraid of a powerful enemy. Deborah called a leader named Barak and said, \"Be brave! God will go before you.\"\n\n"
+            "Barak said, \"I'll only go if you come too.\" So Deborah went, strong and unafraid. With God's help, they won, and there was peace in the land.\n\n"
+            "Remember: God gives wisdom and courage to those who ask Him."
+        ),
+    },
+    {
+        "id": "hero-mary",
+        "category": "hero",
+        "title": "Mary Says Yes to God",
+        "theme": "Trusting God's plan",
+        "emoji": "💙",
+        "color": "#CDEAFE",
+        "minutes": 2,
+        "body": (
+            "Mary was a young woman who loved God. One day an angel named Gabriel appeared to her.\n\n"
+            "\"Do not be afraid, Mary,\" the angel said. \"God is very pleased with you. You will have a baby boy, and you will name Him Jesus. He will be the Son of God!\"\n\n"
+            "Mary was surprised, but she trusted God. \"I am God's servant,\" she said. \"Let it be as you have said.\"\n\n"
+            "Mary said yes to God's big plan with a humble, willing heart. And that baby, Jesus, would grow up to bring love and hope to the whole world.\n\n"
+            "Remember: When we trust God and say yes to Him, wonderful things can happen."
+        ),
+    },
+    {
+        "id": "hero-miriam",
+        "category": "hero",
+        "title": "Miriam Watches Over Baby Moses",
+        "theme": "Caring for others",
+        "emoji": "🧺",
+        "color": "#BDE0FE",
+        "minutes": 2,
+        "body": (
+            "When Moses was a tiny baby, he was in danger. To keep him safe, his mother placed him in a little basket and set it gently on the river.\n\n"
+            "His big sister, Miriam, hid nearby to watch over him. She was brave and careful.\n\n"
+            "A princess found the basket and loved the baby right away. Quick-thinking Miriam stepped out and said, \"Shall I find someone to help care for him?\"\n\n"
+            "And so Miriam brought the baby's very own mother to help! Because Miriam watched and acted bravely, baby Moses was safe.\n\n"
+            "Remember: Looking out for others, even in small ways, is a big and beautiful thing to God."
+        ),
+    },
+    {
+        "id": "hero-hannah",
+        "category": "hero",
+        "title": "Hannah's Prayer",
+        "theme": "God hears our prayers",
+        "emoji": "🙏",
+        "color": "#E8DFF5",
+        "minutes": 2,
+        "body": (
+            "Hannah longed for a child of her own. Her heart was heavy and sad.\n\n"
+            "So she went to God's house and prayed and prayed, with tears running down her cheeks. \"Dear God,\" she whispered, \"please remember me.\"\n\n"
+            "God heard Hannah's prayer. After a while, she had a baby boy and named him Samuel.\n\n"
+            "Hannah was so thankful that she sang a happy song to God. She knew that every good gift comes from Him.\n\n"
+            "Remember: God always hears your prayers, even the quiet ones whispered in your heart."
+        ),
+    },
+    {
+        "id": "hero-abigail",
+        "category": "hero",
+        "title": "Abigail the Peacemaker",
+        "theme": "Making peace",
+        "emoji": "🕊️",
+        "color": "#D8F3DC",
+        "minutes": 2,
+        "body": (
+            "Abigail was a wise and kind woman. One day, big trouble was brewing — angry feelings had grown between her household and a leader named David.\n\n"
+            "Abigail did not wait for things to get worse. She quickly gathered food as a gift and hurried to meet David.\n\n"
+            "With gentle, humble words, she asked him not to act in anger. \"Please, let there be peace,\" she said.\n\n"
+            "David listened. \"Thank God for your good sense,\" he told her. Abigail's calm, wise words had stopped a fight before it started.\n\n"
+            "Remember: Kind, gentle words can turn anger into peace. You can be a peacemaker too."
+        ),
+    },
+    {
+        "id": "hero-rahab",
+        "category": "hero",
+        "title": "Rahab's Brave Help",
+        "theme": "Faith and bravery",
+        "emoji": "🪟",
+        "color": "#FFC971",
+        "minutes": 2,
+        "body": (
+            "Rahab lived in a house built right into the city wall. One day, two of God's people came as spies, and they needed somewhere safe to hide.\n\n"
+            "Rahab believed in their God. So she bravely hid them on her rooftop and kept them safe from danger.\n\n"
+            "\"I know the Lord your God is the true God,\" she told them. She asked them to keep her family safe too.\n\n"
+            "They promised, and told her to tie a red cord in her window. Because of Rahab's faith and bravery, she and her whole family were saved.\n\n"
+            "Remember: Faith and bravery can come from anyone, anywhere. God sees your believing heart."
+        ),
+    },
+    {
+        "id": "hero-mary-magdalene",
+        "category": "hero",
+        "title": "Mary and the Empty Tomb",
+        "theme": "Hope and joy",
+        "emoji": "🌅",
+        "color": "#FFD8E4",
+        "minutes": 2,
+        "body": (
+            "Early on Sunday morning, Mary Magdalene walked to the place where Jesus had been laid. Her heart was heavy with sadness.\n\n"
+            "But when she arrived — the stone was rolled away, and the tomb was empty!\n\n"
+            "As she cried, a gentle voice said her name: \"Mary.\" She turned, and it was Jesus, alive again!\n\n"
+            "Her sadness turned into the biggest joy. Jesus said, \"Go and tell the others.\" So Mary ran to share the wonderful news: \"He is alive!\"\n\n"
+            "She was the very first person to tell the world that Jesus had risen.\n\n"
+            "Remember: With Jesus, sadness can turn into joy, and there is always hope."
+        ),
+    },
+    {
+        "id": "hero-moses",
+        "category": "hero",
+        "title": "Moses and the Red Sea",
+        "theme": "God makes a way",
+        "emoji": "🌊",
+        "color": "#A0C4FF",
+        "minutes": 2,
+        "body": (
+            "God chose Moses to lead His people out of a land where they were treated unkindly. They followed him toward freedom.\n\n"
+            "But soon they reached a huge sea, with no way across — and the enemy's army was chasing close behind! The people were terrified.\n\n"
+            "Moses trusted God. \"Do not be afraid,\" he said. \"Stand still and watch what God will do.\"\n\n"
+            "Moses raised his staff, and God pushed back the waters. A dry path opened right through the middle of the sea! The people walked safely across to the other side.\n\n"
+            "Remember: Even when there seems to be no way, God can make one."
+        ),
+    },
+    {
+        "id": "hero-joseph",
+        "category": "hero",
+        "title": "Joseph's Colorful Coat",
+        "theme": "Forgiveness",
+        "emoji": "🧥",
+        "color": "#FFD166",
+        "minutes": 2,
+        "body": (
+            "Joseph's father gave him a beautiful coat of many colors. His brothers grew jealous and treated him very unkindly, sending him far away.\n\n"
+            "But God was with Joseph. Through many ups and downs, Joseph became a great leader in Egypt who helped save people from hunger.\n\n"
+            "Years later, his brothers came needing food — and they didn't even know it was him! Joseph could have stayed angry.\n\n"
+            "Instead, with tears of love, he hugged them. \"You meant to hurt me,\" he said, \"but God turned it into good. I forgive you.\"\n\n"
+            "Remember: Forgiving others sets your heart free, and God can turn hard times into good."
+        ),
+    },
+    {
+        "id": "hero-joshua",
+        "category": "hero",
+        "title": "Joshua and the Walls of Jericho",
+        "theme": "Obeying God",
+        "emoji": "📯",
+        "color": "#FFE08A",
+        "minutes": 2,
+        "body": (
+            "Joshua led God's people to a city with great, tall walls called Jericho. The walls were far too big to climb.\n\n"
+            "But God gave Joshua an unusual plan: \"March around the city once a day for six days. On the seventh day, march around seven times, then blow the trumpets and shout!\"\n\n"
+            "It sounded surprising, but Joshua obeyed exactly. Around and around they marched, quiet and trusting.\n\n"
+            "On the seventh day, they shouted with all their might and blew the trumpets — and the mighty walls came tumbling down!\n\n"
+            "Remember: When we trust and obey God, even big walls can fall."
+        ),
+    },
+    {
+        "id": "hero-gideon",
+        "category": "hero",
+        "title": "Gideon, Small but Mighty",
+        "theme": "God uses the small",
+        "emoji": "🔦",
+        "color": "#FFC971",
+        "minutes": 2,
+        "body": (
+            "Gideon did not feel like a hero. \"I'm the least in my family,\" he said. But God said, \"I will be with you. You are a mighty warrior!\"\n\n"
+            "Gideon gathered an army, but God said, \"You have too many men. I want everyone to see that the victory comes from Me.\" So the army got smaller and smaller — just three hundred men!\n\n"
+            "That night, each man held a trumpet and a torch hidden in a jar. At Gideon's signal, they broke the jars, shone their lights, and blew their trumpets.\n\n"
+            "With God's help, the tiny army won!\n\n"
+            "Remember: You don't have to be big or strong. God can do mighty things through you."
+        ),
+    },
+    {
+        "id": "hero-abraham",
+        "category": "hero",
+        "title": "Abraham Follows God",
+        "theme": "Faith to follow",
+        "emoji": "⭐",
+        "color": "#BDB2FF",
+        "minutes": 2,
+        "body": (
+            "God spoke to Abraham and said, \"Leave your home and go to a new land that I will show you. I will bless you.\"\n\n"
+            "Abraham did not know exactly where he was going. But he trusted God, packed up his family, and set out on the journey.\n\n"
+            "One night God showed him the stars. \"Look up,\" God said. \"Your family will be as many as the stars in the sky.\"\n\n"
+            "Abraham believed God's promise, even though he had to wait a long time. And God kept His word.\n\n"
+            "Remember: We can follow God even when we can't see the whole path. He always keeps His promises."
+        ),
+    },
+    {
+        "id": "hero-samuel",
+        "category": "hero",
+        "title": "Samuel, the Boy Who Listened",
+        "theme": "Listening to God",
+        "emoji": "👂",
+        "color": "#CDEAFE",
+        "minutes": 2,
+        "body": (
+            "Young Samuel helped at God's house. One night, as he lay in bed, he heard a voice call, \"Samuel!\"\n\n"
+            "He ran to the old priest, Eli. \"Here I am!\" But Eli said, \"I didn't call you. Go back to bed.\"\n\n"
+            "It happened again and again. Then Eli understood — it was God calling! He told Samuel, \"If you hear it again, say: Speak, Lord, for your servant is listening.\"\n\n"
+            "So Samuel did. And God spoke to him. From then on, Samuel listened to God all his life and grew up to be a wise leader.\n\n"
+            "Remember: God speaks to those who are ready to listen. You can say, \"Speak, Lord, I'm listening.\""
+        ),
+    },
+    {
+        "id": "hero-elijah",
+        "category": "hero",
+        "title": "Elijah Trusts God",
+        "theme": "Trusting God's power",
+        "emoji": "🔥",
+        "color": "#FFB5A7",
+        "minutes": 2,
+        "body": (
+            "Elijah was a brave helper of God. In his time, many people had forgotten the one true God.\n\n"
+            "So Elijah set up a test on a mountain. \"Let's see whose God is real,\" he said. He even poured water all over his altar, so everyone would know it was God's power and not a trick.\n\n"
+            "Then Elijah prayed a simple prayer: \"Lord, let everyone know that You are God.\"\n\n"
+            "Whoosh! Fire came down from heaven. The people fell to their knees and cried, \"The Lord, He is God!\"\n\n"
+            "Remember: God is powerful and real, and He hears the prayers of those who trust Him."
+        ),
+    },
+    {
+        "id": "hero-peter",
+        "category": "hero",
+        "title": "Peter Walks on Water",
+        "theme": "Keep your eyes on Jesus",
+        "emoji": "🌊",
+        "color": "#A0C4FF",
+        "minutes": 2,
+        "body": (
+            "One stormy night, the disciples were in a boat when they saw Jesus walking on the water toward them!\n\n"
+            "\"Lord, if it's You,\" called Peter, \"let me come to You on the water.\" Jesus said, \"Come.\"\n\n"
+            "So Peter stepped out of the boat — and he walked on the water too! But when he looked at the big waves and the wind, he got scared and began to sink.\n\n"
+            "\"Jesus, save me!\" he cried. At once, Jesus reached out His hand and caught him. \"I've got you,\" Jesus said gently.\n\n"
+            "Remember: When you feel afraid, keep your eyes on Jesus. He is always reaching out to catch you."
+        ),
+    },
+    {
+        "id": "hero-paul",
+        "category": "hero",
+        "title": "Paul's Changed Heart",
+        "theme": "God can change anyone",
+        "emoji": "✉️",
+        "color": "#BDB2FF",
+        "minutes": 2,
+        "body": (
+            "A man named Saul did not like the followers of Jesus at all. He wanted to stop them.\n\n"
+            "But one day, as he traveled down a road, a bright light shone all around him. \"Saul, why are you against Me?\" said the voice of Jesus.\n\n"
+            "From that moment, Saul's heart was changed. He believed in Jesus and took a new name: Paul.\n\n"
+            "Paul spent the rest of his life traveling far and wide, telling everyone about God's love and writing letters full of hope and kindness.\n\n"
+            "Remember: God's love is so big it can change any heart — and give anyone a brand new start."
+        ),
+    },
 ]
 
 

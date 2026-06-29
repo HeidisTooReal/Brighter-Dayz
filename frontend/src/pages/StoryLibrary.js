@@ -9,6 +9,7 @@ import { Loader2, ArrowLeft, BookOpen, Clock } from "lucide-react";
 const FILTERS = [
   { key: "all", label: "All Books" },
   { key: "bible", label: "Bible & Jesus" },
+  { key: "hero", label: "Bible Heroes" },
   { key: "life", label: "Real Life" },
 ];
 
@@ -43,7 +44,7 @@ export default function StoryLibrary() {
   const shown = books.filter((b) => filter === "all" || b.category === filter);
 
   if (open) {
-    const cover = open.category === "bible" ? ASSETS.jesus : ASSETS.sunnyHero;
+    const cover = open.category === "life" ? ASSETS.sunnyHero : open.category === "hero" ? ASSETS.shepherd : ASSETS.jesus;
     return (
       <KidShell child={child} title="Story Library" bg="linear-gradient(180deg,#FFF1D6 0%,#FDFBF7 55%)">
         <div className="mx-auto max-w-2xl">
