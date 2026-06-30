@@ -1,5 +1,14 @@
 # Brighter Dayz — PRD
 
+## Bug fix — 2026-06-30 ("I can't login" on production)
+- **Symptom:** Login failed on production with "Something went wrong." (worked fine via the brighterdayz.faith URL, failed via mindful-youth-13.emergent.host).
+- **Root cause:** The production frontend (served at mindful-youth-13.emergent.host) calls the backend at a DIFFERENT origin (REACT_APP_BACKEND_URL = https://brighterdayz.faith, the now-live custom domain). The frontend sent credentialed requests (axios `withCredentials:true` in lib/api.js + ChatBuddy.js fetch `credentials:'include'`) while the backend CORS returned `Access-Control-Allow-Origin: *` with `allow_credentials=True`. Browsers BLOCK wildcard-origin + credentials → all cross-origin calls (incl. /api/auth/login) failed.
+- **Fix (code):** App is fully Bearer-token (localStorage), so credentials aren't needed. Removed `withCredentials:true` (frontend/src/lib/api.js) and `credentials:'include'` (frontend/src/pages/ChatBuddy.js). Also set backend CORS `allow_credentials=False` (server.py) so wildcard origin is valid and this class of bug can't recur.
+- **Verified:** testing_agent iteration_9 (10/10 backend + FE e2e login/chat/TTS, no regression). CORS preflight now returns ACAO:* without allow-credentials; cross-origin POST login = 200. Login confirmed working via UI at brighterdayz.faith.
+- **ACTION REQUIRED BY USER:** Immediate workaround — use https://brighterdayz.faith to log in (works now). Permanent fix needs a REDEPLOY to push the code change so mindful-youth-13.emergent.host also works.
+- **Follow-up (optional):** set CORS_ORIGINS to explicit prod origins; add res.ok check before reading chat stream in ChatBuddy.js.
+
+
 ## Bug fix — 2026-06-29 (app voice reverted to AI on preview)
 - **Symptom:** On preview, read-aloud "voice changed" — it was using the OpenAI Coral AI fallback instead of the owner's cloned voice.
 - **Root cause:** Both preview & production share the SAME `ELEVENLABS_API_KEY`, so they share one ElevenLabs voice library. Preview's `app_config.app_voice.voice_id` was `9TxZk...`; when the owner's voice was uploaded to PRODUCTION, the prod POST `/api/app-voice` deleted the existing ElevenLabs voice (`9TxZk`) before creating prod's new clone (`5St5`). That left preview pointing at a deleted voice_id, so `voiceclone.synthesize` threw and `/api/tts` fell back to `source:'ai'`.
