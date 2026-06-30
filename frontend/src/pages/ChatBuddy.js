@@ -35,7 +35,6 @@ export default function ChatBuddy() {
       const res = await fetch(`${API}/children/${childId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        credentials: "include",
         body: JSON.stringify({ message: msg }),
       });
       const reader = res.body.getReader();
